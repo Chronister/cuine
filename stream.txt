@@ -1,0 +1,52 @@
+
+# C Compiler -- overview
+
+As a little bit of background information, a compiler is
+typically split into a front-end and a back-end:
+
+    Front-end: Lexer/Parser, AST, type- and error-checking
+    Back-end: AST/IR -> assembly
+
+This project is an attempt to write the entire compiler, the
+whole pipeline, from scratch in C. I haven't written a
+compiler before, so I'm muddling through based on what I've
+learned in my university Compilers course.
+
+So, that in mind, here's what I'm working on tonight:
+
+I've already written the scanner/lexer. It's not anything
+fancy, just your basic state machine except implemented with
+a lot of switches and gotos.
+
+Now I'm tackling the parser. I think typically most C
+compilers might use recursive-descent / LL(k) parsers, but
+for this project I'm approaching it with an LR(0)/SLR parser
+first, simply because I've just learned about them and they
+sound neat and I haven't gotten a chance to build one since
+the course only covers using the tools that do it for you.
+
+It's a little tough in C, since all the data structures have
+to be built up by hand. Right now, I'm trying to work
+through the process of building the state machine that
+handles shifting/reducing rules.
+
+Well, let's get to it.
+
+
+Why not C++?
+
+Here's the c99 spec. 552 pages.
+
+Here's a version of the C++ spec. Let's wait for it to load.
+
+1,368 pages. Ain't _nobody_ got time for that.
+
+Most of the C99 spec is library stuff anyhow, and I'm going
+easy on that for the first version of the compiler.
+
+So yeah.
+
+
+Whoops. I hope twitch records this, because I sure didn't.
+
+

@@ -1,0 +1,41 @@
+Nfa (id:0)
+    All States (with hashcodes):
+        0 (obj id: 0000000002481120)
+        1 (obj id: 0000000002481150)
+        2 (obj id: 0000000002481180)
+        3 (obj id: 00000000024811B0)
+        4 (obj id: 00000000024811E0)
+        5 (obj id: 0000000002481210)
+        6 (obj id: 0000000002481240)
+        7 (obj id: 0000000002481270)
+        8 (obj id: 00000000024812A0)
+        9 (obj id: 00000000024812D0)
+    Start State:   0
+    Accept States:  [0]
+    Transitions:
+        0:
+            S -> 1
+            LParen -> 3
+            Identifier -> 9
+        1:
+            EOF -> 2
+        2:
+        3:
+            L -> 4
+            S -> 6
+            S -> 6
+            LParen -> 3
+            Identifier -> 9
+        4:
+            RParen -> 5
+        5:
+        6:
+            Comma -> 7
+        7:
+            L -> 8
+            S -> 6
+            S -> 6
+            LParen -> 3
+            Identifier -> 9
+        8:
+        9:
