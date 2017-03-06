@@ -12,7 +12,7 @@ void Usage(const char* ProgName) {
 char* ReadFileAndNullTerminate(const char* Filename)
 {
     FILE* InFile = NULL;
-    InFile = fopen(Filename, "r");
+    InFile = fopen(Filename, "rb");
     if (InFile == NULL) {
         fprintf(stderr, "Could not open file %s\n", Filename);
         return NULL;
@@ -23,12 +23,17 @@ char* ReadFileAndNullTerminate(const char* Filename)
     fseek(InFile, 0, SEEK_SET);
 
     char* In = (char*)malloc(InFileSize + 1);
-    fread(In, InFileSize, 1, InFile);
+    int Result = fread(In, 1, InFileSize, InFile);
+    if (Result != InFileSize) {
+        fprintf(stderr, "Only got %d of %d bytes of file!", Result, (int)InFileSize);
+        exit(1);
+    }
     In[InFileSize] = 0;
     fclose(InFile);
     return In;
 }
 
+#if 0
 void WalkTree(lst_node* Node, int Tab) {
     switch(Node->Type) {
         case LST_Identifier:
@@ -49,6 +54,7 @@ void WalkTree(lst_node* Node, int Tab) {
             break;
     }
 }
+#endif
 
 int main(int ArgCount, char* ArgValues[])
 {
@@ -69,6 +75,7 @@ int main(int ArgCount, char* ArgValues[])
     Tzer.At = File;
     Tzer.Line = 1;
     Tzer.Filename = Filename;
+    
 
 #if 0
     token Token;
@@ -81,13 +88,15 @@ int main(int ArgCount, char* ArgValues[])
         }
     } while (Token.Type != TOKEN_EOF);
 #else
-    lst_node* Result = Parse_List(&Tzer);
+    void* Result = Parse(&Tzer);
+#if 0
     if (Result != NULL) {
         WalkTree(Result, 0);
         printf("\n");
+    }
+#endif
 #endif
         printf("Parsing complete\n");
-    }
 }
 
 

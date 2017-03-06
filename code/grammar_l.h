@@ -1,5 +1,6 @@
 #ifndef GRAMMAR_L_H
 #define GRAMMAR_L_H
+#include "macro.h"
 
 /// L-specific symbols
 
@@ -17,7 +18,6 @@
     X(L),               
 
 #define L_(x) L_##x
-#define STR(x) #x
 
 typedef enum {
     L_TerminalMIN = -1,

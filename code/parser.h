@@ -1,12 +1,14 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "parser_l.h"
-
 /// Grammar rules
 
 typedef int32_t cf_symbol_t;
 #define ARRAY_TYPE cf_symbol_t
+#include "array.c"
+#define SET_TYPE cf_symbol_t
+#include "set.c"
+#define ARRAY_TYPE set(cf_symbol_t)
 #include "array.c"
 
 typedef struct {
@@ -19,6 +21,9 @@ typedef struct {
 
 typedef struct {
     array(cf_production) Productions;
+    cf_symbol_t Root;
+    set(cf_symbol_t) FollowTable[NonterminalMAX];
+    set(cf_symbol_t) FirstTable[NonterminalMAX];
 } cf_grammar;
 
 
@@ -72,6 +77,6 @@ typedef struct {
 
 #define cell(T, r, c) (T.Table[((r)* T.Cols + (c))])
 
-lst_node* Parse_List(tokenizer* Tokenizer);
+void* Parse(tokenizer* Tokenizer);
 
 #endif

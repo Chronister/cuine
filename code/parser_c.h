@@ -1,10 +1,16 @@
 #ifndef PARSER_C_H
 #define PARSER_C_H
 
+#include "grammar_c.h"
 
-#define CST_NODE_(x) CST_NODE_##x
+#define TerminalMIN C_TerminalMIN
+#define TerminalMAX C_TerminalMAX
+#define NonterminalMIN C_NonterminalMIN
+#define NonterminalMAX C_NonterminalMAX
 
 /*
+#define CST_NODE_(x) CST_NODE_##x
+
 typedef enum {
     C_TERMINAL_LIST(CST_NODE_)
     C_NONTERMINAL_LIST(CST_NODE_)
@@ -46,5 +52,18 @@ typedef struct {
 } cst_node_translation_unit;
 
 */
+
+typedef struct {
+    void* Memory;
+    size_t Used;
+    size_t Allocated;
+} c_context;
+
+#define CF_MAX_SYMBOLS_PER_RULE 20
+
+#define PARSE_FUNC(name, Context, Tokens, Parsed) void* name(c_context* Context, token Tokens[CF_MAX_SYMBOLS_PER_RULE], void* Parsed[CF_MAX_SYMBOLS_PER_RULE])
+typedef PARSE_FUNC(parse_func, Context, Tokens, Parsed);
+
+#define context c_context
 
 #endif

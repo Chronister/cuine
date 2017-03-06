@@ -104,7 +104,7 @@ extern const char*
 TokenType_Str(token_type Type)
 {
     int T = (int)Type;
-    if (T >= 0 && T < NonterminalMAX) {
+    if (T >= 0 && T < C_NonterminalMAX) {
         return C_SymbolNames[Type];
     }
     return "??? Unknown Token ???";
@@ -270,7 +270,7 @@ get_token:
             // TODO this is wrong
             if (*(Tzer->At + 1) && *(Tzer->At + 2) == '\'') {
                 ++Tzer->At;
-                Token.Type = CharLiteral;
+                Token.Type = CharacterConstant;
                 Token.Text = Tzer->At;
                 Tzer->At++;
                 return Token;
@@ -356,14 +356,14 @@ float_scan:
                 Token.Text = Tzer->At;
 
                 if (*Tzer->At == '.') {
-                    Token.Type = FloatLiteral;
+                    Token.Type = FloatingConstant;
                     goto float_scan_significand;
                 } 
                 else 
                 {
                     if (*Tzer->At == '0') {
                         Tzer->At++;
-                        Token.Type = IntLiteral;
+                        Token.Type = IntegerConstant;
                         if (*Tzer->At == 'x') {
                             Tzer->At++;
                             goto int_scan_hex;   
@@ -382,7 +382,7 @@ float_scan:
                         case 'f': goto float_scan_suffix;
 
                         default: {
-                            Token.Type = IntLiteral;
+                            Token.Type = IntegerConstant;
                             Token.TextLength = Tzer->At - Token.Text;
                             return Token;
                         } break;
@@ -422,7 +422,7 @@ float_scan_suffix:
                         default: goto float_accept;
                     }
 float_accept:
-                    Token.Type = FloatLiteral;
+                    Token.Type = FloatingConstant;
                     Token.TextLength = Tzer->At - Token.Text;
                     return Token;
 
@@ -443,7 +443,7 @@ int_scan_octal:
 int_suffix:
 
 int_accept:
-                    Token.Type = IntLiteral;
+                    Token.Type = IntegerConstant;
                     Token.TextLength = Tzer->At - Token.Text;
                     return Token;
                 }

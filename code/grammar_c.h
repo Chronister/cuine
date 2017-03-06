@@ -5,9 +5,10 @@
 
 #define C_TERMINAL_LIST(X)  \
     X(EndOfFile),           \
-    X(CharLiteral),         \
-    X(IntLiteral),          \
-    X(FloatLiteral),        \
+    X(IntegerConstant),     \
+    X(FloatingConstant),    \
+    X(CharacterConstant),   \
+                            \
     X(StringLiteral),       \
                             \
     X(Identifier),          \
@@ -106,11 +107,14 @@
     X(_IMAGINARY),      
 
 #define C_NONTERMINAL_LIST(X)       \
+    X(Constant),                    \
+                                    \
     /* § A.2.1 Expressions */       \
     X(PrimaryExpression),           \
     X(PostfixExpression),           \
     X(ArgumentExpressionList),      \
     X(UnaryExpression),             \
+    X(UnaryOperator),               \
     X(CastExpression),              \
     X(MultiplicativeExpression),    \
     X(AdditiveExpression),          \
@@ -138,6 +142,7 @@
     X(StructOrUnionSpecifier),      \
     X(StructOrUnion),               \
     X(StructDeclarationList),       \
+    X(StructDeclaration),           \
     X(SpecifierQualifierList),      \
     X(StructDeclaratorList),        \
     X(StructDeclarator),            \
@@ -181,20 +186,22 @@
     X(ExternalDeclaration),         \
     X(FunctionDefinition),          \
     X(DeclarationList),             \
+                                    \
+    X(SourceFile),                  \
 
 #define _(x) x
 #define STR(x) #x
 
 typedef enum {
-    TerminalMIN = 0,
+    C_TerminalMIN = -1,
     C_TERMINAL_LIST(_)
-    TerminalMAX,
+    C_TerminalMAX,
 } c_terminal_symbol;
 
 typedef enum {
-    NonterminalMIN = TerminalMAX - 1,
+    C_NonterminalMIN = C_TerminalMAX - 1,
     C_NONTERMINAL_LIST(_)
-    NonterminalMAX,
+    C_NonterminalMAX,
 } c_nonterminal_symbol;
 
 const char* C_SymbolNames[] = {

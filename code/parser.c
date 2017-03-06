@@ -2,12 +2,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "scanner.h"
+#include "parser_c.h"
 #include "parser.h"
 
-#define countof(x) ((sizeof((x)))/sizeof((x)[0]))
+#define PRINT_SLR_TABLES 0
 
-#define GrammarRule(Nonterminal, ...) _GrammarRule(Nonterminal, ##__VA_ARGS__, L_TerminalMIN)
-#define GETRULE(Grammar, N) Grammar.Productions.Data[N]
+#define GrammarRule(ParseFunc, Nonterminal, ...) _GrammarRule(ParseFunc, Nonterminal, ##__VA_ARGS__, TerminalMIN)
+#define GETRULE(Grammar, N) (Grammar)->Productions.Data[N]
 
 cf_production _GrammarRule(parse_func Func, cf_symbol_t Nonterminal, ...)
 {
@@ -21,111 +22,180 @@ cf_production _GrammarRule(parse_func Func, cf_symbol_t Nonterminal, ...)
     do {
         array_push(cf_symbol_t, &Result.Sequence, Next);
         Next = va_arg(Args, cf_symbol_t);
-    } while (Next != L_TerminalMIN && Result.Sequence.Length < CF_MAX_SYMBOLS_PER_RULE);
+    } while (Next != TerminalMIN && Result.Sequence.Length < CF_MAX_SYMBOLS_PER_RULE);
 
     return Result;
 }
 
-PARSE_FUNC(parse_rule0, Context, Tokens, Parsed) {
-    return Parsed[0];
+
+void GenerateFollowTable(cf_grammar* Grammar);
+
+#include "parser_c.c"
+
+void PrintRule(FILE* f, cf_grammar* Grammar, int RuleNum) {
+    cf_production Rule = GETRULE(Grammar, RuleNum);
+    fprintf(f, "%s <- ", SymbolStr(Rule.Nonterminal));
+    array_for (cf_symbol_t, Sym, Rule.Sequence) {
+        fprintf(f, "%s ", SymbolStr(Sym));
+    }
 }
 
-PARSE_FUNC(parse_rule1, Context, Tokens, Parsed) {
-    // Tokens = L_LParen, L_L, L_RParen
-    return Parsed[1];
-};
-
-PARSE_FUNC(parse_rule2, Context, Tokens, Parsed) {
-    // Tokens = Identifier
-    lst_node_identifier Result = { LST_Identifier };
-    Result.Header.SourceLine = Tokens[0].LineStart;
-
-    Result.Value = Tokens[0].Text;
-    Result.ValueLength = Tokens[0].TextLength;
-    return PushNode(Context, Result);
-};
-
-PARSE_FUNC(parse_rule3, Context, Tokens, Parsed) {
-    // Tokens = L_S 
-    lst_node_list Value = { LST_List };
-    Value.Header.SourceLine = Tokens[0].LineStart;
-
-    lst_node_list* Result = (lst_node_list*)PushNode(Context, Value);
-    Result->Data = Parsed[0];
-    Result->First = Result;
-    return (lst_node*)Result;
+void PrintItem(FILE* f, cf_grammar* Grammar, lr_item Item) {
+    cf_production Rule = GETRULE(Grammar, Item.RuleNum);
+    fprintf(f, "%s <- ", SymbolStr(Rule.Nonterminal));
+    array_for (cf_symbol_t, Sym, Rule.Sequence) {
+        if (SymIndex == Item.Position) fprintf(f, ". ");
+        fprintf(f, "%s ", SymbolStr(Sym));
+    }
+    if (Item.Position == Rule.Sequence.Length) fprintf(f, ". ");
 }
 
-#define TEST_GRAMMAR 2
-
-#if TEST_GRAMMAR == 1
-PARSE_FUNC(parse_rule4, Context, Tokens, Parsed) {
-    // Tokens = L_L, L_S 
-    lst_node_list Value = { LST_List };
-    Value.Header.SourceLine = Tokens[0].LineStart;
-
-    lst_node_list* Result = (lst_node_list*)PushNode(Context, Value);
-    lst_node_list* Prev = (lst_node_list*)Parsed[0];
-    Result->Data = Parsed[2];
-    Result->First = Prev->First;
-    Prev->Next = Result;
-    return (lst_node*)Result;
+void PrintState(FILE* f, cf_grammar* Grammar, lr_fsa_state State) {
+    fprintf(f, "\n");
+    array_for(lr_item, Item, State.Items) {
+        fprintf(f, "\t| ");
+        PrintItem(f, Grammar, Item);
+        fprintf(f, "\n");
+    }
+    fprintf(f, "\n");
 }
-#elif TEST_GRAMMAR == 2
-PARSE_FUNC(parse_rule4, Context, Tokens, Parsed) {
-    // Tokens = L_S, L_L 
-    lst_node_list Value = { LST_List };
-    Value.Header.SourceLine = Tokens[0].LineStart;
 
-    lst_node_list* Result = (lst_node_list*)PushNode(Context, Value);
-    lst_node_list* Prev = (lst_node_list*)Parsed[2];
-    Result->Data = Parsed[0];
-    Result->First = Result;
-    Result->Next = Prev;
-    return (lst_node*)Result;
+void PrintRelevantState(FILE* f, cf_grammar* Grammar, lr_fsa_state State, cf_symbol_t Prev, cf_symbol_t Next, bool IncludeReduceable) {
+    fprintf(f, "\n");
+    array_for(lr_item, Item, State.Items) {
+        cf_production Rule = GETRULE(Grammar, Item.RuleNum);
+        if ((Prev != NonterminalMIN && Item.Position > 0 && Rule.Sequence.Data[Item.Position - 1] == Prev) ||
+            (Next != NonterminalMIN && Item.Position < Rule.Sequence.Length && Rule.Sequence.Data[Item.Position] == Next) ||
+            (IncludeReduceable && Item.Position == Rule.Sequence.Length)) {
+            fprintf(f, "\t| ");
+            PrintItem(f, Grammar, Item);
+            fprintf(f, "\n");
+        }
+    }
+    fprintf(f, "\t| ...\n\n");
+}
+
+#if 0
+static bool
+AllNonterminal(set(cf_symbol_t) S) {
+    set_for(cf_symbol_t, Item, S) {
+        if (!(NonterminalMIN < Item && Item < NonterminalMAX)) return false;
+    }
+    return true;
+}
+
+static bool
+AllTerminal(set(cf_symbol_t) S) {
+    set_for(cf_symbol_t, Item, S) {
+        if (!(TerminalMIN < Item && Item < TerminalMAX)) return false;
+    }
+    return true;
 }
 #endif
 
-// Here's the test grammar.
-// In BNF notation, this would look like:
-//
-//   S' ::= S EOF
-//   S  ::= (L) | IDENTIFIER
-//   L  ::= S
-//   L  ::= L,S
-//
-// Essentially, correctly nested comma-separated lists of identifiers.
-// So LISP, basically (except with commas!)
+void GenerateFollowTable(cf_grammar* Grammar) {
+    set(cf_symbol_t) First[NonterminalMAX];
+    set(cf_symbol_t) Follow[NonterminalMAX];
+    bool Nullable[NonterminalMAX];
 
-cf_grammar TestGrammar()
-{
-    cf_production Rules[] = {
-        GrammarRule(parse_rule0, L_Sp, L_S, L_EOF),
-        GrammarRule(parse_rule1, L_S, L_LParen, L_L, L_RParen),
-        GrammarRule(parse_rule2, L_S, L_Identifier),
-        GrammarRule(parse_rule3, L_L, L_S),
-#if TEST_GRAMMAR == 1
-        GrammarRule(parse_rule4, L_L, L_L, L_Comma, L_S),
-#elif TEST_GRAMMAR == 2
-        GrammarRule(parse_rule4, L_L, L_S, L_Comma, L_L),
-#endif
-    };
-
-    array(cf_production) Productions = array_new(cf_production, countof(Rules));
-    Productions.Length = countof(Rules);
-
-    array_for(cf_production, Rule, Productions) {
-        *RuleRef = Rules[(RuleRef - Productions.Data)];
+    for (cf_symbol_t Sym = TerminalMIN + 1; Sym < TerminalMAX; ++Sym) {
+        Nullable[Sym] = false;
+        First[Sym] = set_init(cf_symbol_t, 1, Sym);
+        Follow[Sym] = set_init(cf_symbol_t, 0);
     }
 
-    cf_grammar Grammar = { Productions };
+    for (cf_symbol_t Sym = NonterminalMIN + 1; Sym < NonterminalMAX; ++Sym) {
+        Nullable[Sym] = false; // Assume not nullable until proven
+        First[Sym] = set_init(cf_symbol_t, 0);
+        Follow[Sym] = set_init(cf_symbol_t, 0);
+    }
 
-    return Grammar;
+    bool Changed;
+    do {
+        Changed = false;
+        array_for(cf_production, Rule, Grammar->Productions) {
+            int k = Rule.Sequence.Length;
+            cf_symbol_t X = Rule.Nonterminal;
+
+            // Check if the nonterminal production is nullable or is composed entirely of
+            // nullable productions
+            if (k == 0) { Nullable[X] = true; }
+            bool AllNullable = true;
+            set_for(cf_symbol_t, Item, Rule.Sequence) {
+                AllNullable = Nullable[Item] && AllNullable;
+            }
+            if (AllNullable) {
+                Changed = Changed || !Nullable[Rule.Nonterminal];
+                Nullable[Rule.Nonterminal] = true;
+            }
+
+            for (int i = 0; i <= k - 1; ++i) {
+                cf_symbol_t Yi = Rule.Sequence.Data[i];
+
+                // If everything up to this point in the rule is nullable,
+                // then the FIRST of the nonterminal includes the FIRST of this
+                // symbol
+                AllNullable = true;
+                for (int Index = 0; Index <= i - 1; Index++) { 
+                    cf_symbol_t Item = Rule.Sequence.Data[Index];
+                    AllNullable = Nullable[Item] && AllNullable;
+                }
+                if (AllNullable) { 
+                    Changed = Changed || set_union(cf_symbol_t, &First[X], First[Yi]) > 0;
+                }
+
+                // If everything up after this point in the rule is nullable,
+                // then the FOLLOW of this symbol includes the FOLLOW of the
+                // nonterminal
+                AllNullable = true;
+                for (int Index = i + 1; Index <= k - 1; Index++) { 
+                    cf_symbol_t Item = Rule.Sequence.Data[Index];
+                    AllNullable = Nullable[Item] && AllNullable;
+                }
+                if (AllNullable) {
+                    Changed = Changed || set_union(cf_symbol_t, &Follow[Yi], Follow[X]) > 0;
+                }
+
+                // If everything between this point in the rule and a future
+                // point in the rule is nullable, then the FOLLOW of this symbol
+                // includes the FIRST of that point in the rule
+                for (int j = i + 1; j <= k - 1; ++j) {
+                cf_symbol_t Yj = Rule.Sequence.Data[j];
+                    AllNullable = true;
+                    for (int Index = i + 1; Index <= j - 1; Index++) { 
+                        cf_symbol_t Item = Rule.Sequence.Data[Index];
+                        AllNullable = Nullable[Item] && AllNullable;
+                    }
+                    if (AllNullable) { 
+                        Changed = Changed || set_union(cf_symbol_t, &Follow[Yi], First[Yj]) > 0;
+                    }
+                }
+            }
+        }
+    } while (Changed);
+
+    // Special case grammar rule 0, since we are defining it as the overarching
+    // rule in the grammar and it needs to accept on an EOF
+    set_add(cf_symbol_t, &Follow[Grammar->Root], EndOfFile);
+
+#if PRINT_SLR_TABLES
+    for (cf_symbol_t Sym = NonterminalMIN + 1; Sym < NonterminalMAX; ++Sym) {
+        printf("%s:\n", SymbolStr(Sym));
+        printf("\tNullable: %c\n", Nullable[Sym] ? 'T' : 'F');
+        printf("\tFIRST: ");
+        set_for(cf_symbol_t, Item, First[Sym]) printf("%s ", SymbolStr(Item));
+        printf("\n");
+        printf("\tFOLLOW: ");
+        set_for(cf_symbol_t, Item, Follow[Sym]) printf("%s ", SymbolStr(Item));
+        printf("\n");
+    }
+#endif
+
+    memcpy(Grammar->FollowTable, Follow, sizeof(Follow));
+    memcpy(Grammar->FirstTable, First, sizeof(First));
 }
 
-size_t MakeState(cf_grammar Grammar, array(lr_fsa_state)* States, ptrdiff_t PrevStateIndex, lr_item FromItem);
-
-void ItemClosure(cf_grammar Grammar, lr_fsa_state* State)
+void ItemClosure(cf_grammar* Grammar, lr_fsa_state* State)
 {
     // We need to bring in the closure of all of the items that can be
     // started from existing items. E.g., if you have a rule:
@@ -154,11 +224,11 @@ void ItemClosure(cf_grammar Grammar, lr_fsa_state* State)
             cf_production Rule = GETRULE(Grammar, Item.RuleNum);
             if (Item.Position == Rule.Sequence.Length) { continue; }
             cf_symbol_t Symbol = Rule.Sequence.Data[Item.Position];
-            if (L_NonterminalMIN < Symbol && Symbol < L_NonterminalMAX) {
-                array_for(cf_production, OtherRule, Grammar.Productions) {
+            if (NonterminalMIN < Symbol && Symbol < NonterminalMAX) {
+                array_for(cf_production, OtherRule, Grammar->Productions) {
                     if (OtherRule.Nonterminal == Symbol) {
                         lr_item NewItem = (lr_item){ 
-                            .RuleNum = OtherRuleRef - Grammar.Productions.Data, 
+                            .RuleNum = OtherRuleRef - Grammar->Productions.Data, 
                             .Position = 0 
                         };
                         array_for(lr_item, Existing, State->Items) {
@@ -179,7 +249,7 @@ reject:
     } while (NumItems < State->Items.Length);
 }
 
-void Transitions(cf_grammar Grammar, lr_fsa_state* State) {
+void Transitions(cf_grammar* Grammar, lr_fsa_state* State) {
     // Once we know what all of the items are, we can add transitions for each
     // incomplete item
     array_for (lr_item, I, State->Items) {
@@ -198,12 +268,23 @@ void Transitions(cf_grammar Grammar, lr_fsa_state* State) {
     }
 }
 
+typedef struct {
+    // Index of state coming from
+    int SourceIndex; 
+    // Item transitioning on
+    lr_item SourceItem; 
+    // Index of transition in the source item's transitions array that will need to be updated
+    int TransitionIndex; 
+} fsa_state_task;
+#define ARRAY_TYPE fsa_state_task
+#include "array.c"
 
-size_t MakeState(cf_grammar Grammar, array(lr_fsa_state)* States, ptrdiff_t PrevStateIndex, lr_item FromItem)
+int MakeState(cf_grammar* Grammar, array(lr_fsa_state)* States, array(fsa_state_task)* WorkQueue,
+              int PrevStateIndex, lr_item FromItem)
 {
     assert(PrevStateIndex >= 0);
     lr_fsa_state* Result = array_push(lr_fsa_state, States, (lr_fsa_state){0});
-    size_t ResultIndex = Result - States->Data;
+    int ResultIndex = Result - States->Data;
     Result->Items = array_new(lr_item, 8);
     Result->Transitions = array_new(lr_transition, 8);
     
@@ -251,43 +332,53 @@ reject:
 
     Transitions(Grammar, Result);
 
+
     array_for (lr_transition, T, Result->Transitions) {
-        TRef->DestIndex = MakeState(Grammar, States, ResultIndex, T.SourceItem);
-        Result = States->Data + ResultIndex;
+        fsa_state_task Task = {
+            .SourceIndex = ResultIndex,
+            .SourceItem = T.SourceItem,
+            .TransitionIndex = TIndex,
+        };
+        array_push(fsa_state_task, WorkQueue, Task);
     }
 
     return ResultIndex;
 }
 
-void PrintParseTable(lr_parse_table Table) {
-    printf("  ");
-    for (cf_symbol_t Symbol = L_TerminalMIN + 1; Symbol < L_NonterminalMAX; ++Symbol) {
-        printf("%16s", L_SymbolNames[Symbol]);
+static void PrintParseTable(lr_parse_table Table) {
+    FILE* f = fopen("table.csv", "w");
+    assert(f != NULL);
+    fprintf(f, "STATE,");
+    for (cf_symbol_t Symbol = TerminalMIN + 1; Symbol < NonterminalMAX; ++Symbol) {
+        fprintf(f, "%s,", SymbolStr(Symbol));
     }
-    printf("\n");
+    fprintf(f, "\n");
 
     for (size_t RowIndex = 0; RowIndex < Table.Rows; ++RowIndex) {
         lr_table_transition* Row = Table.Table + RowIndex*Table.Cols;
-        printf("%2d", (int)RowIndex);
+        fprintf(f, "%d,", (int)RowIndex);
         for (size_t ColIndex = 0; ColIndex < Table.Cols; ++ColIndex) {
             lr_table_transition T = Row[ColIndex];
             if (T.Type == T_SHIFT || T.Type == T_GOTO) {
-                printf("\t\t%c%-4d",
+                fprintf(f, "%c%d,",
                        (T.Type == T_SHIFT ? 'S' : 'G'),
                        (int)T.State);
             } else if (T.Type == T_REDUCE) {
-                printf("\t\t%c%-4d", 'R', (int)T.RuleNum);
+                fprintf(f, "%c%d,", 'R', (int)T.RuleNum);
             } else {
-                printf("\t\t");
+                fprintf(f, ",");
             }
         }
-        printf("\n");
+        fprintf(f, "\n");
     }
+    fclose(f);
 }
 
-lr_parse_table Parse_BuildTable(cf_grammar Grammar)
+static array(lr_fsa_state) _States;
+
+lr_parse_table Parse_BuildTable(cf_grammar* Grammar)
 {
-    array(lr_fsa_state) States = array_new(lr_fsa_state, Grammar.Productions.Length);
+    array(lr_fsa_state) States = array_new(lr_fsa_state, Grammar->Productions.Length);
     lr_fsa_state* StartState = array_push(lr_fsa_state, &States, (lr_fsa_state){0});
 
     StartState->Transitions = array_new(lr_transition, 8);
@@ -299,21 +390,32 @@ lr_parse_table Parse_BuildTable(cf_grammar Grammar)
     ItemClosure(Grammar, StartState);
     Transitions(Grammar, StartState);
 
+    array(fsa_state_task) WorkQueue = array_new(fsa_state_task, States.Length);
+
     array_for (lr_transition, T, StartState->Transitions) {
-        TRef->DestIndex = MakeState(Grammar, &States, 0, T.SourceItem);
-        StartState = States.Data;
+        fsa_state_task Task = {
+            .SourceIndex = 0,
+            .SourceItem = T.SourceItem,
+            .TransitionIndex = TIndex,
+        };
+        array_push(fsa_state_task, &WorkQueue, Task);
+    }
+
+    while (WorkQueue.Length > 0) {
+        fsa_state_task Task = array_pop(fsa_state_task, &WorkQueue);
+        int StateIndex = MakeState(Grammar, &States, &WorkQueue, Task.SourceIndex, Task.SourceItem);
+        States.Data[Task.SourceIndex].Transitions.Data[Task.TransitionIndex].DestIndex = StateIndex;
     }
 
     // At this point we have a graph of fsa_states (edges given by all the
     // transitions out of State).
-    // Number each state (have them in array?) and use that to generate the
-    // table!
+    // Number each state and use that to generate the table!
     // One row for each state, one S/R column for each terminal, one Goto column
     // for each nonterminal
 
     lr_parse_table Result = { 
         .Rows = States.Length, 
-        .Cols = L_NonterminalMAX, 
+        .Cols = NonterminalMAX, 
     };
     Result.Table = calloc(Result.Rows * Result.Cols, sizeof(lr_table_transition));
     
@@ -339,21 +441,24 @@ lr_parse_table Parse_BuildTable(cf_grammar Grammar)
         // Also, if we have REDUCE/REDUCE conflicts, later
         // terminals/nonterminals will overwrite earlier ones.
 
-        int ReduceRule = -1;
         array_for(lr_item, I, State.Items) {
-            if (I.Position == GETRULE(Grammar, I.RuleNum).Sequence.Length) {
-                if (ReduceRule != -1) {
-                    fprintf(stderr, "\n LR BUILD ERROR: Reduce/Reduce conflict in state %d: Rule %d and rule %d\n\n", StateIndex, ReduceRule, I.RuleNum);
-                    goto fail;
-                }
-                ReduceRule = I.RuleNum;
-                for (int Col = L_TerminalMIN + 1; Col < L_TerminalMAX; ++Col) {
-                    // Hmm... need to be able to know what the rule number is.
-                    // Or do we? All that matters is that the parser can use
-                    // this information to take a few symbols off of the stack
-                    // and push the reduced form on. Let's just include the rule
-                    // directly for now. This might inflate the table size a bit.
-                    Row[Col] = (lr_table_transition){ .Type = T_REDUCE, .RuleNum = I.RuleNum };
+            cf_production Rule = GETRULE(Grammar, I.RuleNum);
+            if (I.Position == Rule.Sequence.Length) {
+                // Go through all of the terminals in the follow set for the
+                // rule's nonterminal and add reduce transitions on those only
+                set_for(cf_symbol_t, Sym, Grammar->FollowTable[Rule.Nonterminal]) {
+                    assert(TerminalMIN < Sym && Sym < TerminalMAX);
+                    if (Row[Sym].Type == T_REDUCE) {
+                        fprintf(stderr, "\n LR BUILD ERROR: Reduce/Reduce conflict in state %d on %s.\n", StateIndex, SymbolStr(Sym));
+                        PrintState(stderr, Grammar, State);
+                        fprintf(stderr, "    Rule #%d: ", Row[Sym].RuleNum);
+                        PrintRule(stderr, Grammar, Row[Sym].RuleNum);
+                        fprintf(stderr, "\n    Rule #%d: ", I.RuleNum);
+                        PrintRule(stderr, Grammar, I.RuleNum);
+                        fprintf(stderr, "\n    Resolving in favor of reducing #%d.\n\n", I.RuleNum);
+                        //goto fail;
+                    }
+                    Row[Sym] = (lr_table_transition){ .Type = T_REDUCE, .RuleNum = I.RuleNum };
                 }
             }
         }
@@ -362,14 +467,19 @@ lr_parse_table Parse_BuildTable(cf_grammar Grammar)
             array_for(lr_transition, T, State.Transitions) {
                 // We can reverse engineer the index in the states array of the
                 // transition destination by subtracting the pointer
-                if (L_TerminalMIN < T.Symbol && T.Symbol < L_TerminalMAX) {
+                if (TerminalMIN < T.Symbol && T.Symbol < TerminalMAX) {
                     if (Row[T.Symbol].Type == T_REDUCE) {
-                        fprintf(stderr, "\n LR BUILD ERROR: Shift/Reduce conflict in state %d.\n", StateIndex);
-                        fprintf(stderr, "    Reduce rule #%d, Shift to state %d.\n\n", Row[T.Symbol].RuleNum, T.DestIndex);
+                        fprintf(stderr, "\n LR BUILD ERROR: Shift/Reduce conflict in state %d on %s:\n", StateIndex, SymbolStr(T.Symbol));
+                        PrintRelevantState(stderr, Grammar, State, 0, T.Symbol, true);
+                        fprintf(stderr, "    Reduce rule #%d: ", Row[T.Symbol].RuleNum);
+                        PrintRule(stderr, Grammar, Row[T.Symbol].RuleNum);
+                        fprintf(stderr, "\n    Shift state %d -> state %d on %s.\n", StateIndex, T.DestIndex, SymbolStr(T.Symbol));
+                        PrintRelevantState(stderr, Grammar, States.Data[T.DestIndex], T.Symbol, 0, false);
+                        fprintf(stderr, "    Resolving in favor of shifting to %d.\n\n", T.DestIndex);
                         //goto fail;
                     }
                     Row[T.Symbol] = (lr_table_transition){ .Type = T_SHIFT, .State = T.DestIndex };
-                } else if (L_NonterminalMIN < T.Symbol && T.Symbol < L_NonterminalMAX) {
+                } else if (NonterminalMIN < T.Symbol && T.Symbol < NonterminalMAX) {
                     Row[T.Symbol] = (lr_table_transition){ .Type = T_GOTO, .State = T.DestIndex };
                 }
             }
@@ -396,12 +506,14 @@ lr_parse_table Parse_BuildTable(cf_grammar Grammar)
     array_for(lr_fsa_state, State, States) {
         fprintf(f, "        %d:\n", StateIndex);
         array_for(lr_transition, Edge, State.Transitions) {
-            fprintf(f, "            \001%s\001 -> %d\n", L_SymbolNames[Edge.Symbol], (int)Edge.DestIndex);
+            fprintf(f, "            \001%s\001 -> %d\n", SymbolStr(Edge.Symbol), (int)Edge.DestIndex);
         }
     }
     fclose(f);
 
     // TODO clean up states
+    _States = States;
+
     return Result;
 
 fail:
@@ -414,31 +526,19 @@ fail:
 }
 
 
-static token
-TranslateType(token Token) {
-    switch(Token.Type) {
-        case Comma: Token.Type = L_Comma; break; 
-        case LParen: Token.Type = L_LParen; break;
-        case RParen: Token.Type = L_RParen; break;
-        case Identifier: Token.Type = L_Identifier; break;
-        case EndOfFile: Token.Type = L_EOF; break;
-    }
-    return Token;
-}
-
 typedef struct {
     token Token;
     int State;
-    lst_node* Data;
+    void* Data;
 } lr_stack_item;
 #define ARRAY_TYPE lr_stack_item
 #include "array.c"
 
-lst_node* Parse_List(tokenizer* Tokenizer)
+void* Parse(tokenizer* Tokenizer)
 {
-    l_context Context = { malloc(0xf0000), 0, 0xf0000 };
-    cf_grammar Grammar = TestGrammar();
-    lr_parse_table Table = Parse_BuildTable(Grammar);
+    context Context = { malloc(0xf0000), 0, 0xf0000 };
+    cf_grammar Grammar = GenerateGrammar();
+    lr_parse_table Table = Parse_BuildTable(&Grammar);
 
     if (Table.Table == NULL) { return NULL; }
 
@@ -446,16 +546,16 @@ lst_node* Parse_List(tokenizer* Tokenizer)
 
     array(lr_stack_item) Stack = array_new(lr_stack_item, 10);
 
-    token Token = TranslateType(PeekToken(Tokenizer)); 
+    token Token = Process(PeekToken(Tokenizer)); 
     int State = 0;
 
     do {
-        if (Token.Type == L_TerminalMIN) { Token = TranslateType(PeekToken(Tokenizer)); }
+        if (Token.Type == TerminalMIN) { Token = Process(PeekToken(Tokenizer)); }
         lr_table_transition Action = cell(Table, State, Token.Type);
 
         switch(Action.Type) {
             case T_SHIFT: {
-                printf("Shift %d -> %d\n", State, (int)Action.State);
+                printf("Shift %d -> %d on %s\n", State, (int)Action.State, SymbolStr(Token.Type));
 
                 lr_stack_item Pair = { Token, State, NULL };
                 array_push(lr_stack_item, &Stack, Pair);
@@ -463,21 +563,23 @@ lst_node* Parse_List(tokenizer* Tokenizer)
 
                 // Consume token
                 GetToken(Tokenizer);
-                Token = (token){ .Type = L_TerminalMIN };
+                Token = (token){ .Type = TerminalMIN };
 
             } break;
 
             case T_GOTO: {
                 printf("Goto %d -> %d\n", State, (int)Action.State);
                 State = Action.State;
-                Token = (token){ .Type = L_TerminalMIN };
+                Token = (token){ .Type = TerminalMIN };
             } break;
 
             case T_REDUCE: {
-                printf("Reduce rule %d\n", (int)Action.RuleNum);
+                printf("Reduce rule %d ", (int)Action.RuleNum);
+                PrintRule(stdout, &Grammar, Action.RuleNum);
+                printf("\n");
                 cf_production Rule = Grammar.Productions.Data[Action.RuleNum];
                 token Tokens[CF_MAX_SYMBOLS_PER_RULE];
-                lst_node* Parsed[CF_MAX_SYMBOLS_PER_RULE];
+                void* Parsed[CF_MAX_SYMBOLS_PER_RULE];
                 for (int i = 0; i < Rule.Sequence.Length; ++i) {
                     lr_stack_item Pair = array_pop(lr_stack_item, &Stack);
                     Tokens[Rule.Sequence.Length - 1 - i] = Pair.Token;
@@ -495,303 +597,23 @@ lst_node* Parse_List(tokenizer* Tokenizer)
 
             default: {
                 // TODO better error messages!
-                fprintf(stderr, "Syntax error of some kind on line %d:%d\n", Token.LineStart, Token.LineEnd);
-                fprintf(stderr, "we're in state %d with a %s token\n", (int)State, L_SymbolNames[Token.Type]);
+                fprintf(stderr, "\nSyntax error on line %d:%d\n", Token.LineStart, Token.LineEnd);
+                fprintf(stderr, "   got: %s\n", SymbolStr(Token.Type));
+                PrintState(stderr, &Grammar, _States.Data[State]);
+                fprintf(stderr, "\n");
+                //fprintf(stderr, "we're in state %d with a %s token\n", (int)State, SymbolStr(Token.Type));
+#if 0
+                if (Token.Type == L_Identifier) {
+                    fprintf(stderr, "\tid(%s)\n", Tokenizer->Start);
+                }
+#endif
                 array_free(lr_stack_item, &Stack);
                 return NULL;
             } break;
         }
-    } while (!(Stack.Length == 1 && array_peek(lr_stack_item, &Stack).Token.Type == L_Sp));
+    } while (!(Stack.Length == 1 && array_peek(lr_stack_item, &Stack).Token.Type == Grammar.Root));
 
-    lst_node* Root = array_pop(lr_stack_item, &Stack).Data;
+    void* Root = array_pop(lr_stack_item, &Stack).Data;
     array_free(lr_stack_item, &Stack);
     return Root;
 }
-
-#if 0
-void Foo(void)
-{
-    // TODO need a way to specify the code to generate/run when these rules are
-    // matched.
-    cf_production Productions[] = {
-
-        /* § A.2.1 Expressions */
-        GrammarRule(PrimaryExpression,  Identifier);
-        GrammarRule(PrimaryExpression,  Constant);
-        GrammarRule(PrimaryExpression,  StringLiteral);
-        GrammarRule(PrimaryExpression,  LParen, Expression, RParen);
-
-        GrammarRule(PostfixExpression,  PrimaryExpression);
-        GrammarRule(PostfixExpression,  PostfixExpression, LBracket, Expression, RBracket);
-        GrammarRule(PostfixExpression,  PostfixExpression, LParen, RParen);
-        GrammarRule(PostfixExpression,  PostfixExpression, LParen, ArgumentExpressionList, RParen);
-        GrammarRule(PostfixExpression,  PostfixExpression, Dot, Identifier);
-        GrammarRule(PostfixExpression,  PostfixExpression, Arrow, Identifier);
-        GrammarRule(PostfixExpression,  PostfixExpression, Increment);
-        GrammarRule(PostfixExpression,  PostfixExpression, Decrement);
-        GrammarRule(PostfixExpression,  LParen, TypeName, RParen, LCurly, InitializerList, RCurly);
-        GrammarRule(PostfixExpression,  LParen, TypeName, RParen, LCurly, InitializerList, RCurly, Comma);
-
-        GrammarRule(ArgumentExpressionList,  AssignmentExpression);
-        GrammarRule(ArgumentExpressionList,  ArgumentExpressionList, AssignmentExpression);
-
-        GrammarRule(UnaryExpression,  PostfixExpression);
-        GrammarRule(UnaryExpression,  Increment, UnaryExpression);
-        GrammarRule(UnaryExpression,  Decrement, UnaryExpression);
-        GrammarRule(UnaryExpression,  UnaryOperator, CastExpression);
-        GrammarRule(UnaryExpression,  SIZEOF, UnaryExpression);
-        GrammarRule(UnaryExpression,  SIZEOF, LParen, Typename, RParen);
-        
-        GrammarRule(UnaryOperator,  Ampersand);
-        GrammarRule(UnaryOperator,  Asterisk);
-        GrammarRule(UnaryOperator,  Plus);
-        GrammarRule(UnaryOperator,  Minus);
-        GrammarRule(UnaryOperator,  BitNot);
-        GrammarRule(UnaryOperator,  LogicNot);
-
-        GrammarRule(CastExpression,  UnaryExpression);
-        GrammarRule(CastExpression,  LParen, TypeName, RParen, CastExpression);
-
-        GrammarRule(MultiplicativeExpression,  CastExpression);
-        GrammarRule(MultiplicativeExpression,  MultiplicativeExpression, Asterisk, CastExpression);
-        GrammarRule(MultiplicativeExpression,  MultiplicativeExpression, Divide, CastExpression);
-        GrammarRule(MultiplicativeExpression,  MultiplicativeExpression, Modulus, CastExpression);
-
-        GrammarRule(AdditiveExpression,  MultiplicativeExpression);
-        GrammarRule(AdditiveExpression,  AdditiveExpression, Plus, MultiplicativeExpression);
-        GrammarRule(AdditiveExpression,  AdditiveExpression, Minus, MulitplicativeExpression);
-
-        GrammarRule(ShiftExpression,  AdditiveExpression);
-        GrammarRule(ShiftExpression,  ShiftExpression, LBitShift, AdditiveExpression);
-        GrammarRule(ShiftExpression,  ShiftExpression, RBitShift, AdditiveExpression);
-
-        GrammarRule(RelationalExpression,  ShiftExpression);
-        GrammarRule(RelationalExpression,  RelationalExpression, Less, ShiftExpression);
-        GrammarRule(RelationalExpression,  RelationalExpression, Greater, ShiftExpression);
-        GrammarRule(RelationalExpression,  RelationalExpression, LessEquals, ShiftExpression);
-        GrammarRule(RelationalExpression,  RelationalExpression, GreaterEquals, ShiftExpression);
-
-        GrammarRule(EqualityExpression,  RelationalExpression);
-        GrammarRule(EqualityExpression,  EqualityExpression, Equals, RelationalExpression);
-        GrammarRule(EqualityExpression,  EqualityExpression, LogicNotEquals, RelationalExpression);
-
-        GrammarRule(ANDExpression,  EqualityExpression);
-        GrammarRule(ANDExpression,  ANDExpression, Ampersand, EqualityExpression);
-
-        GrammarRule(ExclusiveORExpression,  ANDExpression);
-        GrammarRule(ExclusiveORExpression,  ExclusiveORExpression, BitXor, ANDExpression);
-
-        GrammarRule(InclusiveORExpression, ExclusiveORExpression);
-        GrammarRule(InclusiveORExpression, InclusiveORExpression, BitOr, ANDExpression);
-
-        GrammarRule(LogicalANDExpression,  InclusiveORExpression);
-        GrammarRule(LogicalANDExpression,  LogicalANDExpression, LogicAnd, InclusiveORExpression);
-
-        GrammarRule(LogicalORExpression,  LogicalANDExpression);
-        GrammarRule(LogicalORExpression,  LogicalORExpression, LogicOr, LogicalANDExpression);
-
-        GrammarRule(ConditionalExpression,  LogicalORExpression);
-        GrammarRule(ConditionalExpression,  ConditionalExpression, QuestionMark, Expression, Colon, ConditionalExpression);
-
-        GrammarRule(AssignmentExpression,  ConditionalExpression);
-        GrammarRule(AssignmentExpression,  UnaryExpression, AssignmentOperator, AssignmentExpression);
-
-        GrammarRule(AssignmentOperator,  Assign);
-        GrammarRule(AssignmentOperator,  TimesEquals);
-        GrammarRule(AssignmentOperator,  DivideEquals);
-        GrammarRule(AssignmentOperator,  ModulusEquals);
-        GrammarRule(AssignmentOperator,  PlusEquals);
-        GrammarRule(AssignmentOperator,  MinusEquals);
-        GrammarRule(AssignmentOperator,  LBitShiftEquals);
-        GrammarRule(AssignmentOperator,  RBitShiftEquals);
-        GrammarRule(AssignmentOperator,  BitAndEquals);
-        GrammarRule(AssignmentOperator,  BitXorEquals);
-        GrammarRule(AssignmentOperator,  BitOrEquals);
-
-        GrammarRule(Expression,  AssignmentExpression);
-        GrammarRule(Expression,  Expression, Comma, AssignmentExpression);
-
-        GrammarRule(ConstantExpression,  ConditionalExpression);
-
-        GrammarRule(ConstantExpression,  ConditionalExpression);
-
-        /* § A.2.2 Declarations */
-        GrammarRule(Declaration,  DeclarationSpecifiers, Semicolon);
-        GrammarRule(Declaration,  DeclarationSpecifiers, InitDeclaratorList, Semicolon);
-
-        GrammarRule(DeclarationSpecifiers,  StorageClassSpecifier);
-        GrammarRule(DeclarationSpecifiers,  StorageClassSpecifier, DeclarationSpecifiers);
-        GrammarRule(DeclarationSpecifiers,  TypeSpecifier);
-        GrammarRule(DeclarationSpecifiers,  TypeSpecifier, DeclarationSpecifiers);
-        GrammarRule(DeclarationSpecifiers,  TypeQualifier);
-        GrammarRule(DeclarationSpecifiers,  TypeQualifier, DeclarationSpecifiers);
-        GrammarRule(DeclarationSpecifiers,  FunctionSpecifier);
-        GrammarRule(DeclarationSpecifiers,  FunctionSpecifier, DeclarationSpecifiers);
-
-        GrammarRule(InitDeclaratorList,  InitDeclarator);
-        GrammarRule(InitDeclaratorList,  InitDeclaratorList, Comma, InitDeclarator);
-
-        GrammarRule(InitDeclarator,  Declarator);
-        GrammarRule(InitDeclarator,  Declarator, Equals, Initializer);
-
-        GrammarRule(StorageClassSpecifier,  Typedef);
-        GrammarRule(StorageClassSpecifier,  Extern);
-        GrammarRule(StorageClassSpecifier,  Static);
-        GrammarRule(StorageClassSpecifier,  Auto);
-        GrammarRule(StorageClassSpecifier,  Register);
-
-        GrammarRule(TypeSpecifier,  VOID);
-        GrammarRule(TypeSpecifier,  CHAR);
-        GrammarRule(TypeSpecifier,  SHORT);
-        GrammarRule(TypeSpecifier,  INT);
-        GrammarRule(TypeSpecifier,  LONG);
-        GrammarRule(TypeSpecifier,  FLOAT);
-        GrammarRule(TypeSpecifier,  DOUBLE);
-        GrammarRule(TypeSpecifier,  SIGNED);
-        GrammarRule(TypeSpecifier,  UNSIGNED);
-        GrammarRule(TypeSpecifier,  _BOOL);
-        GrammarRule(TypeSpecifier,  _COMPLEX);
-        GrammarRule(TypeSpecifier,  StructOrUnionSpecifier);
-        GrammarRule(TypeSpecifier,  EnumSpecifier);
-        GrammarRule(TypeSpecifier,  TypedefName);
-
-        GrammarRule(StructOrUnionSpecifier,  StructOrUnion, LCurly, StructDeclarationList, RCurly);
-        GrammarRule(StructOrUnionSpecifier,  StructOrUnion, Identifier, LBracket, StructDeclarationList, RBracket);
-        GrammarRule(StructOrUnionSpecifier,  StructOrUnion, Identifier);
-
-        GrammarRule(StructOrUnion,  Struct);
-        GrammarRule(StructOrUnion,  Union);
-
-        GrammarRule(StructDeclarationList,  StructDeclaration);
-        GrammarRule(StructDeclarationList,  StructDeclarationList, StructDeclaration);
-
-        GrammarRule(StructDeclaration,  SpecifierQualifierList, StructDeclaratorList);
-
-        GrammarRule(SpecifierQualifierList,  TypeSpecifier);
-        GrammarRule(SpecifierQualifierList,  TypeSpecifier, SpecifierQualifierList);
-        GrammarRule(SpecifierQualifierList,  TypeQualifier);
-        GrammarRule(SpecifierQualifierList,  TypeQualifier, SpecifierQualifierList);
-
-        GrammarRule(StructDeclaratorList,  StructDeclarator);
-        GrammarRule(StructDeclaratorList,  StructDeclaratorList, Comma, StructDeclarator);
-
-        GrammarRule(StructDeclarator,  Declarator);
-        GrammarRule(StructDeclarator,  Colon, ConstantExpression);
-        GrammarRule(StructDeclarator,  Declarator, Colon, ConstantExpression);
-
-        GrammarRule(EnumSpecifier,  ENUM, LCurly, EnumeratorList, RCurly);
-        GrammarRule(EnumSpecifier,  ENUM, Identifier, LBracket, EnumeratorList, RCurly);
-        GrammarRule(EnumSpecifier,  ENUM, LCurly, EnumeratorList, Comma, RCurly);
-        GrammarRule(EnumSpecifier,  ENUM, Identifier, LBracket, EnumeratorList, Comma, RCurly);
-        GrammarRule(EnumSpecifier,  ENUM, Identifier);
-
-        GrammarRule(EnumeratorList,  Enumerator);
-        GrammarRule(EnumeratorList,  EnumeratorList, Comma, Enumerator);
-
-        GrammarRule(Enumerator,  EnumerationConstant);
-        GrammarRule(Enumerator,  EnumerationConstant, Equals, ConstantExpression);
-
-        GrammarRule(TypeQualifier,  CONST);
-        GrammarRule(TypeQualifier,  RESTRICT);
-        GrammarRule(TypeQualifier,  VOLATILE);
-
-        GrammarRule(FunctionSpecifier,  INLINE);
-
-        GrammarRule(Declarator,  DirectDeclarator);
-        GrammarRule(Declarator,  Pointer, DirectDeclarator);
-
-        GrammarRule(DirectDeclarator,  Identifier);
-        GrammarRule(DirectDeclarator,  LParen, Declarator, RParen);
-        GrammarRule(DirectDeclarator,  DirectDeclarator, LBracket, RBracket);
-        GrammarRule(DirectDeclarator,  DirectDeclarator, LBracket, AssignmentExpression, RBracket);
-        GrammarRule(DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, RBracket);
-        GrammarRule(DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, AssignmentExpression, RBracket);
-        GrammarRule(DirectDeclarator,  DirectDeclarator, LBracket, STATIC, AssignmentExpression, RBracket);
-        GrammarRule(DirectDeclarator,  DirectDeclarator, LBracket, STATIC, TypeQualifierList, AssignmentExpression, RBracket);
-        GrammarRule(DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, STATIC, AssignmentExpression, RBracket);
-        GrammarRule(DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, Asterisk, RBracket);
-        GrammarRule(DirectDeclarator,  DirectDeclarator, LParen, ParameterTypeList, RParen);
-        GrammarRule(DirectDeclarator,  DirectDeclarator, LParen, RParen);
-        GrammarRule(DirectDeclarator,  DirectDeclarator, LParen, IdentifierList, RParen);
-
-        GrammarRule(Pointer,  Asterisk);
-        GrammarRule(Pointer,  Asterisk, TypeQualifierList);
-        GrammarRule(Pointer,  Asterisk, Pointer);
-        GrammarRule(Pointer,  Asterisk, TypeQualifierList, Pointer);
-
-        GrammarRule(TypeQualifierList,  TypeQualifier);
-        GrammarRule(TypeQualifierList,  TypeQualifierList, TypeQualifier);
-
-        GrammarRule(ParameterTypeList,  ParameterList);
-        GrammarRule(ParameterTypeList,  ParameterList, Comma, Dot, Dot, Dot);
-
-        GrammarRule(ParameterList,  ParameterDeclaration);
-        GrammarRule(ParameterList,  ParameterList, Comma, ParameterDeclaration);
-
-        GrammarRule(ParameterDeclaration,  DeclarationSpecifiers, Declarator);
-        GrammarRule(ParameterDeclaration,  DeclarationSpecifiers);
-        GrammarRule(ParameterDeclaration,  DeclarationSpecifiers, AbstractDeclarator);
-
-        GrammarRule(IdentifierList,  Identifier);
-        GrammarRule(IdentifierList,  IdentifierList, Comma, Identifier);
-
-        GrammarRule(TypeName,  SpecifierQualifierList);
-        GrammarRule(TypeName,  SpecifierQualifierList, AbstractDeclarator);
-
-        GrammarRule(AbstractDeclarator,  Pointer);
-        GrammarRule(AbstractDeclarator,  DirectAbstractDeclarator);
-        GrammarRule(AbstractDeclarator,  Pointer, DirectAbstractDeclarator);
-
-        GrammarRule(DirectAbstractDeclarator,  LParen, AbstractDeclarator, RParen);
-
-        GrammarRule(DirectAbstractDeclarator,  LBracket, RBracket);
-        GrammarRule(DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, RBracket);
-        GrammarRule(DirectAbstractDeclarator,  LBracket, TypeQualifierList, RBracket);
-        GrammarRule(DirectAbstractDeclarator,  LBracket, AssignmentExpression, RBracket);
-        GrammarRule(DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, TypeQualifierList, RBracket);
-        GrammarRule(DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, AssignmentExpression, RBracket);
-        GrammarRule(DirectAbstractDeclarator,  LBracket, TypeQualifierList, AssignmentExpression, RBracket);
-        GrammarRule(DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, TypeQualifierList, AssignmentExpression, RBracket);
-
-        GrammarRule(DirectAbstractDeclarator,  LBracket, STATIC, AssignmentExpression, RBracket);
-        GrammarRule(DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, STATIC, AssignmentExpression, RBracket);
-        GrammarRule(DirectAbstractDeclarator,  LBracket, STATIC, TypeQualifierList, AssignmentExpression, RBracket);
-        GrammarRule(DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, STATIC, TypeQualifierList, AssignmentExpression, RBracket);
-
-        GrammarRule(DirectAbstractDeclarator,  LBracket, TypeQualifierList, STATIC, AssignmentExpression, RBracket);
-        GrammarRule(DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, TypeQualifierList, STATIC, AssignmentExpression, RBracket);
-
-        GrammarRule(DirectAbstractDeclarator,  LBracket, Asterisk, RBracket);
-        GrammarRule(DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, Asterisk, RBracket);
-
-        GrammarRule(DirectAbstractDeclarator,  LParen, RParen);
-        GrammarRule(DirectAbstractDeclarator,  DirectAbstractDeclarator, LParen, RParen);
-        GrammarRule(DirectAbstractDeclarator,  LParen, ParameterTypeList, RParen);
-        GrammarRule(DirectAbstractDeclarator,  DirectAbstractDeclarator, LParen, ParameterTypeList, RParen);
-
-        GrammarRule(TypedefName,  Identifier);
-
-        GrammarRule(Initializer,  AssignmentExpression);
-        GrammarRule(Initializer,  LCurly, InitializerList, RCurly);
-        GrammarRule(Initializer,  LCurly, InitializerList, Comma, RCurly);
-
-        GrammarRule(InitializerList,  Initializer);
-        GrammarRule(InitializerList,  Designation, Initializer);
-        GrammarRule(InitializerList,  InitializerList, Comma, Initializer);
-        GrammarRule(InitializerList,  InitializerList, Comma, Designation, Initializer);
-
-        GrammarRule(Designation,  DesignatorList, Equals);
-
-        GrammarRule(DesignatorList,  Designator);
-        GrammarRule(DesignatorList,  DesignatorList, Designator);
-
-        GrammarRule(Designator,  LBracket, ConstantExpression, RBracket);
-        GrammarRule(Designator,  Dot, Identifier);
- 
-        /* § A.2.3 Statements */
-    };
-
-
-    cf_grammar Grammar = { countof(Productions), Productions };
-}
-#endif

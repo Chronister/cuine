@@ -1,2 +1,4 @@
-*.sublime-workspace
 build/
+table.nfa
+table.csv
+parser.log

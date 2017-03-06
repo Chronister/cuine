@@ -2,9 +2,15 @@
 #define PARSER_L_H
 #include <stdint.h>
 #include <assert.h>
-#include "grammar_c.h"
-#include "grammar_l.h"
 #include "scanner.h"
+
+#include "grammar_l.h"
+#include "grammar_c.h"
+
+#define TerminalMIN L_TerminalMIN
+#define TerminalMAX L_TerminalMAX
+#define NonterminalMIN L_NonterminalMIN
+#define NonterminalMAX L_NonterminalMAX
 
 // Simple test grammar to dry run everything
 
@@ -56,5 +62,7 @@ _PushNode(l_context* Context, lst_node* NodePtr, size_t NodeSize)
 
 #define PARSE_FUNC(name, Context, Tokens, Parsed) lst_node* name(l_context* Context, token Tokens[CF_MAX_SYMBOLS_PER_RULE], lst_node* Parsed[CF_MAX_SYMBOLS_PER_RULE])
 typedef PARSE_FUNC(parse_func, Context, Tokens, Parsed);
+
+#define context l_context
 
 #endif
