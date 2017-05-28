@@ -27,12 +27,45 @@ typedef struct {
 
 typedef struct {
     cst_node_header Header;
-    array(cst_node) ExternDecls;
-} cst_node_translation_unit;
+    const char* Text;
+    int TextLength;
+} cst_node_identifier;
 
 typedef struct {
     cst_node_header Header;
+    array(cst_node) ExternDecls;
+} cst_node_translation_unit;
 
+typedef enum {
+    TYPE_VOID,
+    TYPE_BOOL,
+    TYPE_COMPLEX,
+    TYPE_CHAR,
+    TYPE_SIGNED_CHAR = TYPE_CHAR,
+    TYPE_UNSIGNED_CHAR,
+    TYPE_SHORT,
+    TYPE_UNSIGNED_SHORT,
+    TYPE_INT,
+    TYPE_UNSIGNED_INT,
+    TYPE_LONG,
+    TYPE_UNSIGNED_LONG,
+    TYPE_LONG_LONG,
+    TYPE_UNSIGNED_LONG_LONG,
+    TYPE_FLOAT,
+    TYPE_DOUBLE,
+    TYPE_LONG_DOUBLE,
+} c_builtin_type;
+
+// A type node will be one of:
+//  1. A CST_TypeSpecifier (cst_node_type_specifier*)
+//  2. A CST_Identifier (cst_node_identifier*)
+//  3. A CST_Struct (cst_node_struct*)
+//  3. A CST_Union (cst_node_union*)
+
+// Only for builtin types.
+typedef struct {
+    cst_node_header Header;
+    c_builtin_type Type;
 } cst_node_type_specifier;
 
 typedef enum {
