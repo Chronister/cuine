@@ -113,7 +113,7 @@ cf_grammar GenerateGrammar()
     }
 
     cf_grammar Grammar = { Productions };
-    Grammar.Root = SourceFile;
+    Grammar.Root = L_Sp;
     GenerateFollowTable(&Grammar);
 
     return Grammar;

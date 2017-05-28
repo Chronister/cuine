@@ -135,10 +135,13 @@
     /* § A.2.2 Declarations */      \
     X(Declaration),                 \
     X(DeclarationSpecifiers),       \
+    X(DeclarationQualifiers),       \
     X(InitDeclaratorList),          \
     X(InitDeclarator),              \
     X(StorageClassSpecifier),       \
     X(TypeSpecifier),               \
+    X(MultiType),                   \
+    X(MultiTypeList),               \
     X(StructOrUnionSpecifier),      \
     X(StructOrUnion),               \
     X(StructDeclarationList),       \
@@ -207,6 +210,44 @@ typedef enum {
 const char* C_SymbolNames[] = {
     C_TERMINAL_LIST(STR)
     C_NONTERMINAL_LIST(STR)
+
+    [AUTO] = "auto",
+    [BREAK] = "break",
+    [CASE] = "case",
+    [CHAR] = "char",
+    [CONST] = "const",
+    [CONTINUE] = "continue",
+    [DEFAULT] = "default",
+    [DO] = "do",
+    [DOUBLE] = "double",
+    [ELSE] = "else",
+    [ENUM] = "enum",
+    [EXTERN] = "extern",
+    [FLOAT] = "float",
+    [FOR] = "for",
+    [GOTO] = "goto",
+    [IF] = "if",
+    [INLINE] = "inline",
+    [INT] = "int",
+    [LONG] = "long",
+    [REGISTER] = "register",
+    [RESTRICT] = "restrict",
+    [RETURN] = "return",
+    [SHORT] = "short",
+    [SIGNED] = "signed",
+    [SIZEOF] = "sizeof",
+    [STATIC] = "static",
+    [STRUCT] = "struct",
+    [SWITCH] = "switch",
+    [TYPEDEF] = "typedef",
+    [UNION] = "union",
+    [UNSIGNED] = "unsigned",
+    [VOID] = "void",
+    [VOLATILE] = "volatile",
+    [WHILE] = "while",
+    [_BOOL] = "_Bool",
+    [_COMPLEX] = "_Complex",
+    [_IMAGINARY] = "_Imaginary",
 };
 
 #endif

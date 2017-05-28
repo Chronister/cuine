@@ -24,6 +24,9 @@ typedef struct {
     int LineEnd;
 } token;
 
+#define ARRAY_TYPE token
+#include "array.c"
+
 typedef struct {
     const char* Start;
     const char* LineStart;

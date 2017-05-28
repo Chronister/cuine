@@ -56,6 +56,44 @@ void WalkTree(lst_node* Node, int Tab) {
 }
 #endif
 
+void WalkTree(cst_node* Node, int Tab, bool Inline) {
+    if (!Inline) for (int i = 0; i < Tab; ++i) printf("  ");
+
+    if (Node == NULL) {
+        printf("(null)"); 
+        if (!Inline) printf("\n");
+        return;
+    }
+    switch(*(cst_node_type*)Node) {
+        case CST_TranslationUnit:
+            printf("Translation Unit 1:\n");
+            array_for(cst_node, Decl, ((cst_node_translation_unit*)Node)->ExternDecls) {
+                WalkTree(Decl, Tab + 1, false);
+            }
+            break;
+        case CST_FunctionDefinition:
+            printf("some kind of function definition\n");
+            break;
+        case CST_Declaration:
+            cst_node_declaration* Decl = (cst_node_declaration*)Node;
+            if (Decl->SpecifierFlags & DECL_TYPEDEF) printf("typedef ");
+            if (Decl->SpecifierFlags & DECL_EXTERN) printf("extern ");
+            if (Decl->SpecifierFlags & DECL_STATIC) printf("static ");
+            if (Decl->SpecifierFlags & DECL_AUTO) printf("auto ");
+            if (Decl->SpecifierFlags & DECL_REGISTER) printf("register ");
+            if (Decl->SpecifierFlags & DECL_CONST) printf("const ");
+            if (Decl->SpecifierFlags & DECL_RESTRICT) printf("restrict ");
+            if (Decl->SpecifierFlags & DECL_VOLATILE) printf("volatile ");
+            if (Decl->SpecifierFlags & DECL_INLINE) printf("inline ");
+            printf("<declaration>");
+            if (!Inline) printf("\n");
+            break;
+        case CST_DeclarationList:
+            printf("some kind of declaration list\n");
+            break;
+    }
+}
+
 int main(int ArgCount, char* ArgValues[])
 {
     if (ArgCount < 2) {
@@ -75,7 +113,6 @@ int main(int ArgCount, char* ArgValues[])
     Tzer.At = File;
     Tzer.Line = 1;
     Tzer.Filename = Filename;
-    
 
 #if 0
     token Token;
@@ -86,15 +123,13 @@ int main(int ArgCount, char* ArgValues[])
         } else {
             printf("Got token %s(%.*s) at line %d\n", TokenType_Str(Token.Type), Token.TextLength, Token.Text, Token.LineStart);
         }
-    } while (Token.Type != TOKEN_EOF);
+    } while (Token.Type != EndOfFile);
 #else
     void* Result = Parse(&Tzer);
-#if 0
     if (Result != NULL) {
-        WalkTree(Result, 0);
+        WalkTree(Result, 0, false);
         printf("\n");
     }
-#endif
 #endif
         printf("Parsing complete\n");
 }

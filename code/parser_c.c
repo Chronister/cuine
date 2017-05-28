@@ -13,28 +13,111 @@ SymbolStr(cf_symbol_t Sym)
 static token
 Process (token Token) { return Token; }
 
-PARSE_FUNC(parse_ruleX, Context, Tokens, Parsed) {
-#if 0
-    for (int i = 0; i < CF_MAX_SYMBOLS_PER_RULE; ++i) {
-        printf("Tokens[%d]: %s\n", i, SymbolStr(Tokens[i].Type));
+// TODO: include source file / column information in tokens
+
+PARSE_FUNC(parse_SourceFile, Context, Tokens, Parsed) {
+    return array_at(Parsed, 0);
+}
+
+PARSE_FUNC(parse_TranslationUnit, Context, Tokens, Parsed) {
+    if (array_at(Tokens, 0).Type == ExternalDeclaration) {
+        cst_node_translation_unit Node = { CST_TranslationUnit };
+        Node.Header.SourceLine = array_at(Tokens, 0).LineStart;
+        Node.ExternDecls = array_init(cst_node, 1, array_at(Parsed, 0));
+        return PushNode(Context, Node);
+    } else {
+        assert(array_at(Tokens, 0).Type == TranslationUnit);
+        assert(array_at(Tokens, 1).Type == ExternalDeclaration);
+        cst_node_translation_unit* TU = (cst_node_translation_unit*)array_at(Parsed, 0);
+        array_push(cst_node, &TU->ExternDecls, array_at(Parsed, 1));
+        return array_at(Parsed, 0);
     }
-#endif
+}
+
+PARSE_FUNC(parse_ExternDecl, Context, Tokens, Parsed) {
+    return array_at(Parsed, 0);
+}
+
+PARSE_FUNC(parse_FunctionDefn, Context, Tokens, Parsed) {
+    cst_node_function_definition Node = { CST_FunctionDefinition };
+    //TODO
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_DeclList, Context, Tokens, Parsed) {
+    cst_node_declaration_list Node = { CST_DeclarationList };
+    //TODO
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_Declaration, Context, Tokens, Parsed) {
+    cst_node_declaration* Node = (cst_node_declaration*)array_at(Parsed, 0); // The declaration bubbles up from the specifiers
+
+    if (Tokens.Length == 3) {
+        //TODO
+    }
+    return Node;
+}
+
+PARSE_FUNC(parse_DeclSpecifiers, Context, Tokens, Parsed) {
+    cst_node_declaration Node = { CST_Declaration };
+
+    array_for(token, Token, Tokens) {
+        if (Token.Type == TypeSpecifier) {
+            Node.Type = (cst_node_type_specifier*)array_at(Parsed, TokenIndex);
+        }
+        else {
+            assert(Token.Type == DeclarationQualifiers);
+            Node.SpecifierFlags |= (intptr_t)array_at(Parsed, TokenIndex);
+        }
+    }
+
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_DeclQualifiers, Context, Tokens, Parsed) {
+    intptr_t Result = (intptr_t)array_at(Parsed, 0);
+    if (Tokens.Length > 1) Result |= (intptr_t)array_at(Parsed, 1);
+    return (void*)Result;
+}
+
+PARSE_FUNC(parse_TYPEDEF,  Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_TYPEDEF; }
+PARSE_FUNC(parse_EXTERN,   Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_EXTERN; }
+PARSE_FUNC(parse_STATIC,   Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_STATIC; }
+PARSE_FUNC(parse_AUTO,     Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_AUTO; }
+PARSE_FUNC(parse_REGISTER, Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_REGISTER; }
+PARSE_FUNC(parse_CONST,    Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_CONST; }
+PARSE_FUNC(parse_RESTRICT, Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_RESTRICT; }
+PARSE_FUNC(parse_VOLATILE, Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_VOLATILE; }
+PARSE_FUNC(parse_INLINE,   Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_INLINE; }
+
+PARSE_FUNC(parse_TypeSpecifier, Context, Tokens, Parsed) {
+    cst_node_function_definition Node = { CST_FunctionDefinition };
+    //TODO
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_ruleX, Context, Tokens, Parsed) {
+    //array_for(token, Token, Tokens) {
+    //    printf("\tTokens[%d]: %s\n", TokenIndex, SymbolStr(Token.Type));
+    //}
     return NULL;
 }
+
 
 cf_grammar GenerateGrammar()
 {
     cf_production Rules[] = {
         // Augment grammar with an extra rule
-        GrammarRule(parse_ruleX, SourceFile,  TranslationUnit, EndOfFile),
+        GrammarRule(parse_SourceFile, SourceFile,  TranslationUnit, EndOfFile),
 
         /* § A.1.5 Constants*/
         GrammarRule(parse_ruleX, Constant,  IntegerConstant),
         GrammarRule(parse_ruleX, Constant,  FloatingConstant),
-        GrammarRule(parse_ruleX, Constant,  EnumerationConstant),
+        // x GrammarRule(parse_ruleX, Constant,  EnumerationConstant),
         GrammarRule(parse_ruleX, Constant,  CharacterConstant),
 
-        GrammarRule(parse_ruleX, EnumerationConstant,  Identifier),
+        // x GrammarRule(parse_ruleX, EnumerationConstant,  Identifier),
 
         /* § A.2.1 Expressions */
         GrammarRule(parse_ruleX, PrimaryExpression,  Identifier),
@@ -135,44 +218,57 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, ConstantExpression,  ConditionalExpression),
 
         /* § A.2.2 Declarations */
-        GrammarRule(parse_ruleX, Declaration,  DeclarationSpecifiers, Semicolon),
-        GrammarRule(parse_ruleX, Declaration,  DeclarationSpecifiers, InitDeclaratorList, Semicolon),
+        GrammarRule(parse_Declaration, Declaration,  DeclarationSpecifiers, Semicolon),
+        GrammarRule(parse_Declaration, Declaration,  DeclarationSpecifiers, InitDeclaratorList, Semicolon),
 
-        GrammarRule(parse_ruleX, DeclarationSpecifiers,  StorageClassSpecifier),
-        GrammarRule(parse_ruleX, DeclarationSpecifiers,  StorageClassSpecifier, DeclarationSpecifiers),
-        GrammarRule(parse_ruleX, DeclarationSpecifiers,  TypeSpecifier),
-        GrammarRule(parse_ruleX, DeclarationSpecifiers,  TypeSpecifier, DeclarationSpecifiers),
-        GrammarRule(parse_ruleX, DeclarationSpecifiers,  TypeQualifier),
-        GrammarRule(parse_ruleX, DeclarationSpecifiers,  TypeQualifier, DeclarationSpecifiers),
-        GrammarRule(parse_ruleX, DeclarationSpecifiers,  FunctionSpecifier),
-        GrammarRule(parse_ruleX, DeclarationSpecifiers,  FunctionSpecifier, DeclarationSpecifiers),
+        GrammarRule(parse_DeclSpecifiers, DeclarationSpecifiers,  TypeSpecifier),
+        GrammarRule(parse_DeclSpecifiers, DeclarationSpecifiers,  DeclarationQualifiers, TypeSpecifier),
+        GrammarRule(parse_DeclSpecifiers, DeclarationSpecifiers,  TypeSpecifier, DeclarationQualifiers),
+        GrammarRule(parse_DeclSpecifiers, DeclarationSpecifiers,  DeclarationQualifiers, TypeSpecifier, DeclarationQualifiers),
+
+        GrammarRule(parse_DeclQualifiers, DeclarationQualifiers,  StorageClassSpecifier),
+        GrammarRule(parse_DeclQualifiers, DeclarationQualifiers,  StorageClassSpecifier, DeclarationQualifiers),
+        GrammarRule(parse_DeclQualifiers, DeclarationQualifiers,  TypeQualifier),
+        GrammarRule(parse_DeclQualifiers, DeclarationQualifiers,  TypeQualifier, DeclarationQualifiers),
+        GrammarRule(parse_DeclQualifiers, DeclarationQualifiers,  FunctionSpecifier),
+        GrammarRule(parse_DeclQualifiers, DeclarationQualifiers,  FunctionSpecifier, DeclarationQualifiers),
 
         GrammarRule(parse_ruleX, InitDeclaratorList,  InitDeclarator),
         GrammarRule(parse_ruleX, InitDeclaratorList,  InitDeclaratorList, Comma, InitDeclarator),
 
         GrammarRule(parse_ruleX, InitDeclarator,  Declarator),
-        GrammarRule(parse_ruleX, InitDeclarator,  Declarator, Equals, Initializer),
+        GrammarRule(parse_ruleX, InitDeclarator,  Declarator, Assign, Initializer),
 
-        GrammarRule(parse_ruleX, StorageClassSpecifier,  TYPEDEF),
-        GrammarRule(parse_ruleX, StorageClassSpecifier,  EXTERN),
-        GrammarRule(parse_ruleX, StorageClassSpecifier,  STATIC),
-        GrammarRule(parse_ruleX, StorageClassSpecifier,  AUTO),
-        GrammarRule(parse_ruleX, StorageClassSpecifier,  REGISTER),
+        GrammarRule(parse_TYPEDEF, StorageClassSpecifier,  TYPEDEF),
+        GrammarRule(parse_EXTERN, StorageClassSpecifier,  EXTERN),
+        GrammarRule(parse_STATIC, StorageClassSpecifier,  STATIC),
+        GrammarRule(parse_AUTO, StorageClassSpecifier,  AUTO),
+        GrammarRule(parse_REGISTER, StorageClassSpecifier,  REGISTER),
 
-        GrammarRule(parse_ruleX, TypeSpecifier,  VOID),
-        GrammarRule(parse_ruleX, TypeSpecifier,  CHAR),
-        GrammarRule(parse_ruleX, TypeSpecifier,  SHORT),
-        GrammarRule(parse_ruleX, TypeSpecifier,  INT),
-        GrammarRule(parse_ruleX, TypeSpecifier,  LONG),
-        GrammarRule(parse_ruleX, TypeSpecifier,  FLOAT),
-        GrammarRule(parse_ruleX, TypeSpecifier,  DOUBLE),
-        GrammarRule(parse_ruleX, TypeSpecifier,  SIGNED),
-        GrammarRule(parse_ruleX, TypeSpecifier,  UNSIGNED),
-        GrammarRule(parse_ruleX, TypeSpecifier,  _BOOL),
-        GrammarRule(parse_ruleX, TypeSpecifier,  _COMPLEX),
-        GrammarRule(parse_ruleX, TypeSpecifier,  StructOrUnionSpecifier),
-        GrammarRule(parse_ruleX, TypeSpecifier,  EnumSpecifier),
-        GrammarRule(parse_ruleX, TypeSpecifier,  TypedefName),
+        GrammarRule(parse_TypeSpecifier, TypeSpecifier,  VOID),
+        GrammarRule(parse_TypeSpecifier, TypeSpecifier,  _BOOL),
+        GrammarRule(parse_TypeSpecifier, TypeSpecifier,  _COMPLEX),
+        GrammarRule(parse_TypeSpecifier, TypeSpecifier,  MultiTypeList),
+        GrammarRule(parse_TypeSpecifier, TypeSpecifier,  StructOrUnionSpecifier),
+        GrammarRule(parse_TypeSpecifier, TypeSpecifier,  EnumSpecifier),
+        GrammarRule(parse_TypeSpecifier, TypeSpecifier,  Identifier),
+
+        // Added to the grammar to account for type names like "unsigned long long Foo"
+        // being valid, but type names like "foo bar Foo" being probably invalid
+        // and causing problems with parsing
+        // {
+        GrammarRule(parse_ruleX, MultiTypeList,  MultiType),
+        GrammarRule(parse_ruleX, MultiTypeList,  MultiTypeList, MultiType),
+
+        GrammarRule(parse_ruleX, MultiType,  CHAR),
+        GrammarRule(parse_ruleX, MultiType,  SHORT),
+        GrammarRule(parse_ruleX, MultiType,  INT),
+        GrammarRule(parse_ruleX, MultiType,  LONG),
+        GrammarRule(parse_ruleX, MultiType,  FLOAT),
+        GrammarRule(parse_ruleX, MultiType,  DOUBLE),
+        GrammarRule(parse_ruleX, MultiType,  SIGNED),
+        GrammarRule(parse_ruleX, MultiType,  UNSIGNED),
+        // }
 
         GrammarRule(parse_ruleX, StructOrUnionSpecifier,  StructOrUnion, LCurly, StructDeclarationList, RCurly),
         GrammarRule(parse_ruleX, StructOrUnionSpecifier,  StructOrUnion, Identifier, LBracket, StructDeclarationList, RBracket),
@@ -199,9 +295,9 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, StructDeclarator,  Declarator, Colon, ConstantExpression),
 
         GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, LCurly, EnumeratorList, RCurly),
-        GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, Identifier, LBracket, EnumeratorList, RCurly),
+        GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, Identifier, LCurly, EnumeratorList, RCurly),
         GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, LCurly, EnumeratorList, Comma, RCurly),
-        GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, Identifier, LBracket, EnumeratorList, Comma, RCurly),
+        GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, Identifier, LCurly, EnumeratorList, Comma, RCurly),
         GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, Identifier),
 
         GrammarRule(parse_ruleX, EnumeratorList,  Enumerator),
@@ -210,11 +306,11 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, Enumerator,  EnumerationConstant),
         GrammarRule(parse_ruleX, Enumerator,  EnumerationConstant, Equals, ConstantExpression),
 
-        GrammarRule(parse_ruleX, TypeQualifier,  CONST),
-        GrammarRule(parse_ruleX, TypeQualifier,  RESTRICT),
-        GrammarRule(parse_ruleX, TypeQualifier,  VOLATILE),
+        GrammarRule(parse_CONST, TypeQualifier,  CONST),
+        GrammarRule(parse_RESTRICT, TypeQualifier,  RESTRICT),
+        GrammarRule(parse_VOLATILE, TypeQualifier,  VOLATILE),
 
-        GrammarRule(parse_ruleX, FunctionSpecifier,  INLINE),
+        GrammarRule(parse_INLINE, FunctionSpecifier,  INLINE),
 
         GrammarRule(parse_ruleX, Declarator,  DirectDeclarator),
         GrammarRule(parse_ruleX, Declarator,  Pointer, DirectDeclarator),
@@ -288,7 +384,7 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, DirectAbstractDeclarator,  LParen, ParameterTypeList, RParen),
         GrammarRule(parse_ruleX, DirectAbstractDeclarator,  DirectAbstractDeclarator, LParen, ParameterTypeList, RParen),
 
-        GrammarRule(parse_ruleX, TypedefName,  Identifier),
+        // x GrammarRule(parse_ruleX, TypedefName,  Identifier),
 
         GrammarRule(parse_ruleX, Initializer,  AssignmentExpression),
         GrammarRule(parse_ruleX, Initializer,  LCurly, InitializerList, RCurly),
@@ -354,17 +450,17 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, JumpStatement,  RETURN, Expression, Semicolon),
 
         /* § A.2.4 External definitions */
-        GrammarRule(parse_ruleX, TranslationUnit,  ExternalDeclaration),
-        GrammarRule(parse_ruleX, TranslationUnit,  TranslationUnit, ExternalDeclaration),
+        GrammarRule(parse_TranslationUnit, TranslationUnit,  ExternalDeclaration),
+        GrammarRule(parse_TranslationUnit, TranslationUnit,  TranslationUnit, ExternalDeclaration),
 
-        GrammarRule(parse_ruleX, ExternalDeclaration,  FunctionDefinition),
-        GrammarRule(parse_ruleX, ExternalDeclaration,  Declaration),
+        GrammarRule(parse_ExternDecl, ExternalDeclaration,  FunctionDefinition),
+        GrammarRule(parse_ExternDecl, ExternalDeclaration,  Declaration),
 
-        GrammarRule(parse_ruleX, FunctionDefinition,  DeclarationSpecifiers, Declarator, CompoundStatement),
-        GrammarRule(parse_ruleX, FunctionDefinition,  DeclarationSpecifiers, Declarator, DeclarationList, CompoundStatement),
+        GrammarRule(parse_FunctionDefn, FunctionDefinition,  DeclarationSpecifiers, Declarator, CompoundStatement),
+        GrammarRule(parse_FunctionDefn, FunctionDefinition,  DeclarationSpecifiers, Declarator, DeclarationList, CompoundStatement),
 
-        GrammarRule(parse_ruleX, DeclarationList,  Declaration),
-        GrammarRule(parse_ruleX, DeclarationList,  DeclarationList, Declaration),
+        GrammarRule(parse_DeclList, DeclarationList,  Declaration),
+        GrammarRule(parse_DeclList, DeclarationList,  DeclarationList, Declaration),
     };
 
 

@@ -17,6 +17,8 @@
                             for (T *it##Ref = (A).Data + it##Index, it = *it##Ref; it##Cond; it##Cond = !it##Cond)
 
 #define array_new(T, Capacity) T ## _Array_New(Capacity)
+// NOTE DO NOT TRY TO PUSH TO A WRAPPED ARRAY
+#define array_wrap(T, n, data) T ## _Array_Wrap(n, data)
 #define array_init(T, n, ...) T ## _Array_Init(n, __VA_ARGS__)
 #define array_free(T, A) T ## _Array_Free(A)
 #define array_grow(T, A, NewCapacity) T ## _Array_Grow(A, NewCapacity)
@@ -40,6 +42,14 @@ typedef struct {
 array(a) IDCAT(a, _Array_New) (size_t Capacity)
 {
     array(a) Result = { .Capacity = Capacity, .Data = malloc(sizeof(a) * Capacity)};
+    return Result;
+}
+
+// TODO someone could try to push to this and all hell might break loose
+// add a readonly flag to the array?
+array(a) IDCAT(a, _Array_Wrap) (size_t Length, a* Items)
+{
+    array(a) Result = { .Capacity = Length, .Length = Length, .Data = Items };
     return Result;
 }
 

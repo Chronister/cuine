@@ -25,6 +25,8 @@ typedef struct {
 } lst_node_header;
 
 typedef lst_node_header lst_node;
+#define ARRAY_TYPE lst_node
+#include "array.c"
 
 typedef struct lst_node_list {
     lst_node_header Header;
@@ -60,7 +62,7 @@ _PushNode(l_context* Context, lst_node* NodePtr, size_t NodeSize)
     return Result;
 }
 
-#define PARSE_FUNC(name, Context, Tokens, Parsed) lst_node* name(l_context* Context, token Tokens[CF_MAX_SYMBOLS_PER_RULE], lst_node* Parsed[CF_MAX_SYMBOLS_PER_RULE])
+#define PARSE_FUNC(name, Context, Tokens, Parsed) lst_node* name(l_context* Context, array(token) Tokens, array(lst_node) Parsed)
 typedef PARSE_FUNC(parse_func, Context, Tokens, Parsed);
 
 #define context l_context

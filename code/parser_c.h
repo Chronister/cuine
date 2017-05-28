@@ -8,8 +8,11 @@
 #define NonterminalMIN C_NonterminalMIN
 #define NonterminalMAX C_NonterminalMAX
 
-/*
-#define CST_NODE_(x) CST_NODE_##x
+#define CST_NODE_(x) CST_##x
+
+typedef void* cst_node;
+#define ARRAY_TYPE cst_node
+#include "array.c"
 
 typedef enum {
     C_TERMINAL_LIST(CST_NODE_)
@@ -24,34 +27,43 @@ typedef struct {
 
 typedef struct {
     cst_node_header Header;
-    cst_node_declaration Decl;
-    cst_node_declaration_list* Next;
+    array(cst_node) ExternDecls;
+} cst_node_translation_unit;
+
+typedef struct {
+    cst_node_header Header;
+
+} cst_node_type_specifier;
+
+typedef enum {
+    DECL_TYPEDEF  = 1 << 0,
+    DECL_EXTERN   = 1 << 1,
+    DECL_STATIC   = 1 << 2,
+    DECL_AUTO     = 1 << 3,
+    DECL_REGISTER = 1 << 4,
+    DECL_CONST    = 1 << 5,
+    DECL_RESTRICT = 1 << 6,
+    DECL_VOLATILE = 1 << 7,
+    DECL_INLINE   = 1 << 8,
+} cst_declaration_flag;
+typedef intptr_t cst_declaration_flags;
+
+typedef struct {
+    cst_node_header Header;
+
+    cst_node_type_specifier* Type;
+    cst_declaration_flags SpecifierFlags;
+} cst_node_declaration;
+
+typedef struct {
+    cst_node_header Header;
+    array(cst_node) Declarations;
 } cst_node_declaration_list;
 
 typedef struct {
     cst_node_header Header;
-    cst_node_declaration_specifiers Specifiers;
-    cst_node_declarator Declarator;
-    cst_node_declaration_list* Declarator;
-} cst_node_function_defn;
-
-typedef struct {
-    cst_node_header Header;
-    cst_node_external_decl* Next;
     
-    union {
-        cst_node_type Type;
-        cst_node_function_defn Func;
-        cst_node_declaration Decl;
-    } Child;
-} cst_node_external_decl;
-
-typedef struct {
-    cst_node_header Header;
-    cst_node_external_decl ExternalDeclList;
-} cst_node_translation_unit;
-
-*/
+} cst_node_function_definition;
 
 typedef struct {
     void* Memory;
@@ -61,9 +73,23 @@ typedef struct {
 
 #define CF_MAX_SYMBOLS_PER_RULE 20
 
-#define PARSE_FUNC(name, Context, Tokens, Parsed) void* name(c_context* Context, token Tokens[CF_MAX_SYMBOLS_PER_RULE], void* Parsed[CF_MAX_SYMBOLS_PER_RULE])
+#define PushNode(Context, X) _PushNode(Context, (cst_node*)&(X), sizeof(X))
+inline cst_node* 
+_PushNode(c_context* Context, cst_node* NodePtr, size_t NodeSize)
+{
+    assert(Context->Used + NodeSize < Context->Allocated);
+    cst_node* Result = (cst_node*)((uint8_t*)Context->Memory + Context->Used);
+    Context->Used += NodeSize;
+    memcpy(Result, NodePtr, NodeSize);
+    return Result;
+}
+
+
+#define PARSE_FUNC(name, Context, Tokens, Parsed) void* name(c_context* Context, array(token) Tokens, array(cst_node) Parsed)
 typedef PARSE_FUNC(parse_func, Context, Tokens, Parsed);
 
 #define context c_context
+
+#include "parser.h"
 
 #endif

@@ -2,3 +2,5 @@ build/
 table.nfa
 table.csv
 parser.log
+*.exe
+*.obj

@@ -542,7 +542,7 @@ void* Parse(tokenizer* Tokenizer)
 
     if (Table.Table == NULL) { return NULL; }
 
-    PrintParseTable(Table);
+    //PrintParseTable(Table);
 
     array(lr_stack_item) Stack = array_new(lr_stack_item, 10);
 
@@ -555,7 +555,7 @@ void* Parse(tokenizer* Tokenizer)
 
         switch(Action.Type) {
             case T_SHIFT: {
-                printf("Shift %d -> %d on %s\n", State, (int)Action.State, SymbolStr(Token.Type));
+                //printf("Shift %d -> %d on %s\n", State, (int)Action.State, SymbolStr(Token.Type));
 
                 lr_stack_item Pair = { Token, State, NULL };
                 array_push(lr_stack_item, &Stack, Pair);
@@ -568,15 +568,15 @@ void* Parse(tokenizer* Tokenizer)
             } break;
 
             case T_GOTO: {
-                printf("Goto %d -> %d\n", State, (int)Action.State);
+                //printf("Goto %d -> %d\n", State, (int)Action.State);
                 State = Action.State;
                 Token = (token){ .Type = TerminalMIN };
             } break;
 
             case T_REDUCE: {
-                printf("Reduce rule %d ", (int)Action.RuleNum);
-                PrintRule(stdout, &Grammar, Action.RuleNum);
-                printf("\n");
+                //printf("Reduce rule %d ", (int)Action.RuleNum);
+                //PrintRule(stdout, &Grammar, Action.RuleNum);
+                //printf("\n");
                 cf_production Rule = Grammar.Productions.Data[Action.RuleNum];
                 token Tokens[CF_MAX_SYMBOLS_PER_RULE];
                 void* Parsed[CF_MAX_SYMBOLS_PER_RULE];
@@ -589,7 +589,9 @@ void* Parse(tokenizer* Tokenizer)
                 lr_stack_item ParsedItem = { 
                     .Token = { .Type = Rule.Nonterminal, .LineStart = Tokens[0].LineStart }, 
                     .State = State, 
-                    .Data = Rule.Func(&Context, Tokens, Parsed) };
+                    .Data = Rule.Func(&Context, 
+                                      array_wrap(token, Rule.Sequence.Length, Tokens), 
+                                      array_wrap(cst_node, Rule.Sequence.Length, (cst_node*)Parsed)) };
                 array_push(lr_stack_item, &Stack, ParsedItem);
 
                 Token = (token){ .Type = Rule.Nonterminal};
