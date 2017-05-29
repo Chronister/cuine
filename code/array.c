@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 
 #ifndef ARRAY_TYPE
 #error "You must have ARRAY_TYPE defined before including array.c."

@@ -195,13 +195,13 @@
 #define _(x) x
 #define STR(x) #x
 
-typedef enum {
+typedef enum c_terminal_symbol {
     C_TerminalMIN = -1,
     C_TERMINAL_LIST(_)
     C_TerminalMAX,
 } c_terminal_symbol;
 
-typedef enum {
+typedef enum c_nonterminal_symbol {
     C_NonterminalMIN = C_TerminalMAX - 1,
     C_NONTERMINAL_LIST(_)
     C_NonterminalMAX,

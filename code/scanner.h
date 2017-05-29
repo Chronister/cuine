@@ -1,10 +1,12 @@
 #ifndef SCANNER_H
 #define SCANNER_H
+
+#include "types.h"
 #include "grammar_c.h"
 
 #define TOKEN_(x) TOKEN_##x
 
-typedef enum {
+typedef enum token_type {
     //C_TERMINAL_LIST(TOKEN_)
     TOKEN_L_IDENTIFIER,
     TOKEN_L_LPAREN,
@@ -15,7 +17,7 @@ typedef enum {
 } token_type;
 
 typedef struct {
-    token_type Type;
+    cf_symbol_t Type;
 
     const char* Text;
     int TextLength;

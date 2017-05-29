@@ -75,6 +75,7 @@ void WalkTree(cst_node* Node, int Tab, bool Inline) {
             printf("some kind of function definition\n");
             break;
         case CST_Declaration:
+        {
             cst_node_declaration* Decl = (cst_node_declaration*)Node;
             if (Decl->SpecifierFlags & DECL_TYPEDEF) printf("typedef ");
             if (Decl->SpecifierFlags & DECL_EXTERN) printf("extern ");
@@ -87,9 +88,11 @@ void WalkTree(cst_node* Node, int Tab, bool Inline) {
             if (Decl->SpecifierFlags & DECL_INLINE) printf("inline ");
             printf("<declaration>");
             if (!Inline) printf("\n");
-            break;
+        } break;
         case CST_DeclarationList:
             printf("some kind of declaration list\n");
+            break;
+        default:
             break;
     }
 }

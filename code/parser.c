@@ -94,9 +94,9 @@ AllTerminal(set(cf_symbol_t) S) {
 #endif
 
 void GenerateFollowTable(cf_grammar* Grammar) {
-    set(cf_symbol_t) First[NonterminalMAX];
-    set(cf_symbol_t) Follow[NonterminalMAX];
-    bool Nullable[NonterminalMAX];
+    set(cf_symbol_t) First[NonterminalMAX] = {0};
+    set(cf_symbol_t) Follow[NonterminalMAX] = {0};
+    bool Nullable[NonterminalMAX] = {0};
 
     for (cf_symbol_t Sym = TerminalMIN + 1; Sym < TerminalMAX; ++Sym) {
         Nullable[Sym] = false;
@@ -183,10 +183,10 @@ void GenerateFollowTable(cf_grammar* Grammar) {
         printf("%s:\n", SymbolStr(Sym));
         printf("\tNullable: %c\n", Nullable[Sym] ? 'T' : 'F');
         printf("\tFIRST: ");
-        set_for(cf_symbol_t, Item, First[Sym]) printf("%s ", SymbolStr(Item));
+        set_for(cf_symbol_t, Item, First[Sym]) printf("%s(%d) ", SymbolStr(Item), Item);
         printf("\n");
         printf("\tFOLLOW: ");
-        set_for(cf_symbol_t, Item, Follow[Sym]) printf("%s ", SymbolStr(Item));
+        set_for(cf_symbol_t, Item, Follow[Sym]) printf("%s(%d) ", SymbolStr(Item), Item);
         printf("\n");
     }
 #endif

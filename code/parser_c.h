@@ -1,6 +1,7 @@
 #ifndef PARSER_C_H
 #define PARSER_C_H
 
+#include "macro.h"
 #include "grammar_c.h"
 
 #define TerminalMIN C_TerminalMIN
@@ -14,7 +15,7 @@ typedef void* cst_node;
 #define ARRAY_TYPE cst_node
 #include "array.c"
 
-typedef enum {
+typedef enum cst_node_type {
     C_TERMINAL_LIST(CST_NODE_)
     C_NONTERMINAL_LIST(CST_NODE_)
     CST_NODE_MAX,
@@ -107,7 +108,7 @@ typedef struct {
 #define CF_MAX_SYMBOLS_PER_RULE 20
 
 #define PushNode(Context, X) _PushNode(Context, (cst_node*)&(X), sizeof(X))
-inline cst_node* 
+always_inline cst_node* 
 _PushNode(c_context* Context, cst_node* NodePtr, size_t NodeSize)
 {
     assert(Context->Used + NodeSize < Context->Allocated);

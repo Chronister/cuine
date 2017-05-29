@@ -1,9 +1,10 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include "types.h"
+
 /// Grammar rules
 
-typedef int32_t cf_symbol_t;
 #define ARRAY_TYPE cf_symbol_t
 #include "array.c"
 #define SET_TYPE cf_symbol_t

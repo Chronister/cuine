@@ -43,7 +43,7 @@ ReportScanError(tokenizer* Tzer, const char* Fmt, ...)
     va_list Args;
     va_start(Args, Fmt);
     // Do thing
-    fprintf(stderr, "%s:%d:"PRIdPTR": ", Tzer->Filename, Tzer->Line, Tzer->At - Tzer->LineStart);
+    fprintf(stderr, "%s:%d:%"PRIdPTR": ", Tzer->Filename, Tzer->Line, Tzer->At - Tzer->LineStart);
     vfprintf(stderr, Fmt, Args);
     fprintf(stderr, "\n");
     return;
@@ -371,7 +371,7 @@ float_scan:
                         else goto int_scan_octal;
                     }
                     
-                    while ('0' <= *Tzer->At && *Tzer->At <= '9') *Tzer->At++;
+                    while ('0' <= *Tzer->At && *Tzer->At <= '9') Tzer->At++;
 
                     switch(*Tzer->At) {
                         case '.': goto float_scan_significand;

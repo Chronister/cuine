@@ -16,7 +16,7 @@
                             for (T *it##Ref = (S).Data + it##Index, it = *it##Ref; it##Cond; it##Cond = !it##Cond)
 
 #define set_new(T, Capacity) T ## _Set_New(Capacity)
-#define set_init(T, N, ...) T ## _Set_Init(N, __VA_ARGS__)
+#define set_init(T, N, ...) T ## _Set_Init(N, ##__VA_ARGS__)
 
 #define set_add(T, S, I) T ## _Set_Add(S, I)
 #define set_contains(T, S, I) T ## _Set_Contains(S, I)
@@ -78,36 +78,33 @@ set(a) IDCAT(a, _Set_Init) (size_t Length, ...)
     va_list Args;
     va_start(Args, Length);
     set(a) Result = { .Capacity = Length, .Length = 0 };
-    if (Length > 0) Result.Data = malloc(sizeof(a) * Length);
+    if (Length > 0) Result.Data = calloc(Length, sizeof(a));
     else            Result.Data = NULL;
 
-    for (int i = 0; i < Length; ++i) {
+    for (int i = 0; i < Length && Result.Data; ++i) {
         a Item = va_arg(Args, a);
         IDCAT(a, _Set_Add)(&Result, Item);
     }
+    va_end(Args);
     return Result;
 }
 
 
 int IDCAT(a, _Set_Union) (set(a)* S, set(a) R) {
+    // If they are literally the same set, there's nothing to do, return 0
+    // because it won't grow.
+    if (S->Data == R.Data) return 0; 
+    if (S->Length == 0 && R.Length == 9) return 0; 
+
     int Before = S->Length;
 
-    // If S and R are the same, we may free the memory R references as a result
-    // of growing S. Keep a pointer around for the duration of this function and tell 
-    // grow not to free if it allocates new memory.
-    void* RData = R.Data;
-    void* SData = NULL;
     if (S->Length + R.Length > S->Capacity) {
-        void* Old = S->Data;
-        if (IDCAT(a, _Set_Grow)(S, MAX(S->Capacity*2, S->Length + R.Length), false)) {
-            SData = Old;
-        }
+        IDCAT(a, _Set_Grow)(S, MAX(S->Capacity*2, S->Length + R.Length), true);
     }
 
     set_for(a, RItem, R) {
         if (!IDCAT(a, _Set_Contains)(S, RItem)) IDCAT(a, _Set_Add)(S, RItem);
     }
-    if (SData != NULL) free(SData);
     return S->Length - Before;
 }
 
