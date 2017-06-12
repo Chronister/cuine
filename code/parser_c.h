@@ -89,6 +89,7 @@ typedef struct {
 
 typedef struct {
     cst_node_header Header;
+
     // TODO
 } cst_node_function_type;
 

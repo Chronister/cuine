@@ -6,7 +6,7 @@
 #include "parser.h"
 
 #define PRINT_SLR_TABLES 0
-#define PRINT_SLR_ACTIONS 1
+#define PRINT_SLR_ACTIONS 0
 
 #define GrammarRule(ParseFunc, Nonterminal, ...) _GrammarRule(ParseFunc, Nonterminal, ##__VA_ARGS__, TerminalMIN)
 #define GETRULE(Grammar, N) (Grammar)->Productions.Data[N]

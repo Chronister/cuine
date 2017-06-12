@@ -3,6 +3,8 @@ static int bar = 3, baz;
 
 static const char* quux = "quux";
 
+static volatile const int * const * const volatile ** restrict volatile *foo;
+
 typedef int int32_t;
 
 //long long foo(int bar);

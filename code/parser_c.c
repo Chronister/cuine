@@ -79,13 +79,15 @@ PARSE_FUNC(parse_InitDeclaratorList, Context, Tokens, Parsed) {
 
 PARSE_FUNC(parse_Declaration, Context, Tokens, Parsed) {
     if (Tokens.Length == 3) {
-        // Base declaration list bubbles up from the declaration specifiers
+        // Base declaration list bubbles up from the init declarator list, and we
+        // apply the decl specifiers to all of those
         cst_node_declaration* DeclSpecifiers = array_at(Parsed, 0); 
         cst_node_declaration_list* List = array_at(Parsed, 1); 
 
         array_for(cst_node, Node, List->Declarations) {
             cst_node_declaration* Decl = (cst_node_declaration*)Node;
             Decl->SpecifierFlags = DeclSpecifiers->SpecifierFlags;
+            Decl->BaseType = DeclSpecifiers->BaseType;
         }
         // free(DeclSpecifiers);
         return List;
@@ -224,20 +226,19 @@ PARSE_FUNC(parse_Pointer, Context, Tokens, Parsed) {
     } 
     else if (Tokens.Length == 2 && array_at(Tokens, 1).Type == Pointer) {
         cst_node_declaration* PointerNode = (cst_node_declaration*)array_at(Parsed, 1);
-        array_insert(cst_declaration_flags, &PointerNode->PointerLevel, 0, 0);
+        array_push(cst_declaration_flags, &PointerNode->PointerLevel, 0);
         return PointerNode;
     } else {
         cst_node_declaration* PointerNode = (cst_node_declaration*)array_at(Parsed, 2);
-        array_insert(cst_declaration_flags, 
+        array_push(cst_declaration_flags, 
                      &PointerNode->PointerLevel, 
-                     (cst_declaration_flags)array_at(Parsed, 1), 
-                     0);
+                     (cst_declaration_flags)array_at(Parsed, 1));
         return PointerNode;
     }
 }
 
 PARSE_FUNC(parse_TypeQualifierList, Context, Tokens, Parsed) {
-    if(array_at(Tokens, 0).Type == TypeQualifierList) {
+    if(array_at(Tokens, 0).Type == TypeQualifier) {
         return array_at(Parsed, 0);
     } else {
         return (void*)((cst_declaration_flags)array_at(Parsed, 0) | 
@@ -395,7 +396,7 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, ConstantExpression,  ConditionalExpression),
 
         /* § A.2.2 Declarations */
-        // TODO why is this rule here
+        // TODO why is this ↓ rule here
         GrammarRule(parse_Declaration, Declaration,  DeclarationSpecifiers, Semicolon),
         GrammarRule(parse_Declaration, Declaration,  DeclarationSpecifiers, InitDeclaratorList, Semicolon),
 
@@ -564,7 +565,7 @@ cf_grammar GenerateGrammar()
 
         // x GrammarRule(parse_ruleX, TypedefName,  Identifier),
 
-        GrammarRule(parse_ruleX, Initializer,  AssignmentExpression),
+        GrammarRule(parse_Passthrough, Initializer,  AssignmentExpression),
         GrammarRule(parse_ruleX, Initializer,  LCurly, InitializerList, RCurly),
         GrammarRule(parse_ruleX, Initializer,  LCurly, InitializerList, Comma, RCurly),
 

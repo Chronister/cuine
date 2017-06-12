@@ -17,6 +17,9 @@
 #define array_for(T, it, A) for (int it##Cond = 1, it##Index = 0; it##Cond && it##Index < (A).Length; it##Cond = !it##Cond, it##Index++) \
                             for (T *it##Ref = (A).Data + it##Index, it = *it##Ref; it##Cond; it##Cond = !it##Cond)
 
+#define array_rof(T, it, A) for (int it##Cond = 1, it##Index = ((A).Length - 1); it##Cond && it##Index >= 0; it##Cond = !it##Cond, it##Index--) \
+                            for (T *it##Ref = (A).Data + it##Index, it = *it##Ref; it##Cond; it##Cond = !it##Cond)
+
 #define array_new(T, Capacity) T ## _Array_New(Capacity)
 // NOTE DO NOT TRY TO PUSH TO A WRAPPED ARRAY
 #define array_wrap(T, n, data) T ## _Array_Wrap(n, data)
@@ -96,8 +99,9 @@ a* IDCAT(a, _Array_Insert) (array(a)* A, a Item, int Index)
     if (A->Data == NULL || A->Length + 1 >= A->Capacity)
         IDCAT(a, _Array_Grow)(A, MAX(A->Capacity * 2, 10));
 
-    memmove(A->Data + Index + 1, A->Data + Index, A->Length - Index);
+    memmove(A->Data + Index + 1, A->Data + Index, sizeof(a) * A->Length - Index);
     A->Data[Index] = Item;
+    A->Length++;
     return A->Data + Index;
 }
 

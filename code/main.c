@@ -89,12 +89,13 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
             if (Decl->SpecifierFlags & DECL_VOLATILE) printf("volatile ");
             if (Decl->SpecifierFlags & DECL_INLINE) printf("inline ");
             WalkTree(Decl->BaseType, Tab + 1, true);
-            array_for(cst_declaration_flags, Pointer, Decl->PointerLevel) {
+            array_rof(cst_declaration_flags, Pointer, Decl->PointerLevel) {
                 printf("* ");
                 if (Pointer & DECL_CONST) printf("const ");
                 if (Pointer & DECL_RESTRICT) printf("restrict ");
                 if (Pointer & DECL_VOLATILE) printf("volatile ");
             }
+            WalkTree(Decl->Name, Tab + 1, true);
             if (!Inline) printf("\n");
         } break;
 
@@ -112,6 +113,25 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
         {
             cst_node_identifier* Ident = (cst_node_identifier*)Node;
             printf("%.*s", Ident->TextLength, Ident->Text);
+            if (!Inline) printf("\n");
+        } break;
+
+        case CST_BuiltinType:
+        {
+            cst_node_builtin_type* TypeNode = (cst_node_builtin_type*)Node;
+            if (TypeNode->Type & TYPE_VOID) printf("void ");
+            if (TypeNode->Type & TYPE_BOOL) printf("_Bool ");
+            if (TypeNode->Type & TYPE_CHAR) printf("char ");
+            if (TypeNode->Type & TYPE_SHORT) printf("short ");
+            if (TypeNode->Type & TYPE_INT) printf("int ");
+            if (TypeNode->Type & TYPE_LONG) printf("long ");
+            if (TypeNode->Type & TYPE_LONGLONG) printf("long");
+            if (TypeNode->Type & TYPE_SIGNED) printf("signed ");
+            if (TypeNode->Type & TYPE_UNSIGNED) printf("unsigned ");
+            if (TypeNode->Type & TYPE_FLOAT) printf("float ");
+            if (TypeNode->Type & TYPE_DOUBLE) printf("double ");
+            if (TypeNode->Type & TYPE_COMPLEX) printf("_Complex ");
+
             if (!Inline) printf("\n");
         } break;
 
