@@ -2,10 +2,17 @@
 #include "parser_c.h"
 
 extern const char*
-SymbolStr(cf_symbol_t Sym)
-{
+SymbolStr(cf_symbol_t Sym) {
     if (Sym > C_TerminalMIN && Sym < C_NonterminalMAX) {
         return C_SymbolNames[Sym];
+    }
+    return "???";
+}
+
+extern const char*
+NodeNameStr(cst_node_type NodeType) {
+    if (NodeType >= 0 && NodeType < CST_NODE_MAX) {
+        return CST_NodeNames[NodeType];
     }
     return "???";
 }
@@ -39,7 +46,7 @@ PARSE_FUNC(parse_ExternDecl, Context, Tokens, Parsed) {
 }
 
 PARSE_FUNC(parse_FunctionDefn, Context, Tokens, Parsed) {
-    cst_node_function_definition Node = { CST_FunctionDefinition };
+    cst_node_function_type Node = { CST_FunctionType };
     //TODO
     return PushNode(Context, Node);
 }
@@ -50,13 +57,42 @@ PARSE_FUNC(parse_DeclList, Context, Tokens, Parsed) {
     return PushNode(Context, Node);
 }
 
-PARSE_FUNC(parse_Declaration, Context, Tokens, Parsed) {
-    cst_node_declaration* Node = (cst_node_declaration*)array_at(Parsed, 0); // The declaration bubbles up from the specifiers
-
-    if (Tokens.Length == 3) {
-        //TODO
-    }
+PARSE_FUNC(parse_InitDeclarator, Context, Tokens, Parsed) {
+    // Base declaration bubbles up from the Declarator
+    cst_node_declaration* Node = (cst_node_declaration*)array_at(Parsed, 0);
+    Node->Initializer = array_at(Parsed, 2);
     return Node;
+}
+
+PARSE_FUNC(parse_InitDeclaratorList, Context, Tokens, Parsed) {
+    if (Tokens.Length == 1) {
+        cst_node_declaration_list List = { CST_DeclarationList };
+        List.Declarations = array_init(cst_node, 1, array_at(Parsed, 0));
+        return PushNode(Context, List);
+    }
+    else { // Tokens.Length == 3
+        cst_node_declaration_list* List = array_at(Parsed, 0);
+        array_push(cst_node, &List->Declarations, array_at(Parsed, 2));
+        return List;
+    }
+}
+
+PARSE_FUNC(parse_Declaration, Context, Tokens, Parsed) {
+    if (Tokens.Length == 3) {
+        // Base declaration list bubbles up from the declaration specifiers
+        cst_node_declaration* DeclSpecifiers = array_at(Parsed, 0); 
+        cst_node_declaration_list* List = array_at(Parsed, 1); 
+
+        array_for(cst_node, Node, List->Declarations) {
+            cst_node_declaration* Decl = (cst_node_declaration*)Node;
+            Decl->SpecifierFlags = DeclSpecifiers->SpecifierFlags;
+        }
+        // free(DeclSpecifiers);
+        return List;
+    } else {
+        assert(!"that rule you were confused by was hit");
+        return NULL;
+    }
 }
 
 PARSE_FUNC(parse_DeclSpecifiers, Context, Tokens, Parsed) {
@@ -64,7 +100,7 @@ PARSE_FUNC(parse_DeclSpecifiers, Context, Tokens, Parsed) {
 
     array_for(token, Token, Tokens) {
         if (Token.Type == TypeSpecifier) {
-            Node.Type = (cst_node_type_specifier*)array_at(Parsed, TokenIndex);
+            Node.BaseType = array_at(Parsed, TokenIndex);
         }
         else {
             assert(Token.Type == DeclarationQualifiers);
@@ -76,23 +112,164 @@ PARSE_FUNC(parse_DeclSpecifiers, Context, Tokens, Parsed) {
 }
 
 PARSE_FUNC(parse_DeclQualifiers, Context, Tokens, Parsed) {
-    intptr_t Result = (intptr_t)array_at(Parsed, 0);
-    if (Tokens.Length > 1) Result |= (intptr_t)array_at(Parsed, 1);
+    intptr_t Result = (cst_declaration_flag)array_at(Parsed, 0);
+    if (Tokens.Length > 1) Result |= (cst_declaration_flag)array_at(Parsed, 1);
     return (void*)Result;
 }
 
-PARSE_FUNC(parse_TYPEDEF,  Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_TYPEDEF; }
-PARSE_FUNC(parse_EXTERN,   Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_EXTERN; }
-PARSE_FUNC(parse_STATIC,   Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_STATIC; }
-PARSE_FUNC(parse_AUTO,     Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_AUTO; }
-PARSE_FUNC(parse_REGISTER, Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_REGISTER; }
-PARSE_FUNC(parse_CONST,    Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_CONST; }
-PARSE_FUNC(parse_RESTRICT, Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_RESTRICT; }
-PARSE_FUNC(parse_VOLATILE, Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_VOLATILE; }
-PARSE_FUNC(parse_INLINE,   Context, Tokens, Parsed) { return (void*)(intptr_t)DECL_INLINE; }
+// Passes through the token type's corresponding enum flag as the data "pointer"
+PARSE_FUNC(parse_TYPEDEF,  Context, Tokens, Parsed) { return (void*)(cst_declaration_flag)DECL_TYPEDEF; }
+PARSE_FUNC(parse_EXTERN,   Context, Tokens, Parsed) { return (void*)(cst_declaration_flag)DECL_EXTERN; }
+PARSE_FUNC(parse_STATIC,   Context, Tokens, Parsed) { return (void*)(cst_declaration_flag)DECL_STATIC; }
+PARSE_FUNC(parse_AUTO,     Context, Tokens, Parsed) { return (void*)(cst_declaration_flag)DECL_AUTO; }
+PARSE_FUNC(parse_REGISTER, Context, Tokens, Parsed) { return (void*)(cst_declaration_flag)DECL_REGISTER; }
+PARSE_FUNC(parse_CONST,    Context, Tokens, Parsed) { return (void*)(cst_declaration_flag)DECL_CONST; }
+PARSE_FUNC(parse_RESTRICT, Context, Tokens, Parsed) { return (void*)(cst_declaration_flag)DECL_RESTRICT; }
+PARSE_FUNC(parse_VOLATILE, Context, Tokens, Parsed) { return (void*)(cst_declaration_flag)DECL_VOLATILE; }
+PARSE_FUNC(parse_INLINE,   Context, Tokens, Parsed) { return (void*)(cst_declaration_flag)DECL_INLINE; }
+
+PARSE_FUNC(parse_CHAR,     Context, Tokens, Parsed) { return (void*)(c_builtin_type_flags)TYPE_CHAR; }
+PARSE_FUNC(parse_SHORT,    Context, Tokens, Parsed) { return (void*)(c_builtin_type_flags)TYPE_SHORT; }
+PARSE_FUNC(parse_INT,      Context, Tokens, Parsed) { return (void*)(c_builtin_type_flags)TYPE_INT; }
+PARSE_FUNC(parse_LONG,     Context, Tokens, Parsed) { return (void*)(c_builtin_type_flags)TYPE_LONG; }
+PARSE_FUNC(parse_SIGNED,   Context, Tokens, Parsed) { return (void*)(c_builtin_type_flags)TYPE_SIGNED; }
+PARSE_FUNC(parse_UNSIGNED, Context, Tokens, Parsed) { return (void*)(c_builtin_type_flags)TYPE_UNSIGNED; }
+PARSE_FUNC(parse_FLOAT,    Context, Tokens, Parsed) { return (void*)(c_builtin_type_flags)TYPE_FLOAT; }
+PARSE_FUNC(parse_DOUBLE,   Context, Tokens, Parsed) { return (void*)(c_builtin_type_flags)TYPE_DOUBLE; }
+PARSE_FUNC(parse_COMPLEX,  Context, Tokens, Parsed) { return (void*)(c_builtin_type_flags)TYPE_COMPLEX; }
+
+// Passes through the token type as the data "pointer"
+PARSE_FUNC(parse_PassthroughTokenType,  Context, Tokens, Parsed) { return (void*)(uintptr_t)array_at(Tokens, 0).Type; }
+PARSE_FUNC(parse_Passthrough,  Context, Tokens, Parsed) { return array_at(Parsed, 0); }
+
+PARSE_FUNC(parse_Identifier, Context, Tokens, Parsed) { 
+    cst_node_identifier Iden = { CST_Identifier };
+    Iden.Text = array_at(Tokens, 0).Text;
+    Iden.TextLength = array_at(Tokens, 0).TextLength;
+    return PushNode(Context, Iden);
+}
 
 PARSE_FUNC(parse_TypeSpecifier, Context, Tokens, Parsed) {
-    cst_node_function_definition Node = { CST_FunctionDefinition };
+    switch(array_at(Tokens, 0).Type) {
+        case VOID:
+        {
+            cst_node_builtin_type T = { CST_BuiltinType };
+            T.Type = TYPE_VOID;
+            return PushNode(Context, T);
+        }
+            
+        case _BOOL:
+        {
+            cst_node_builtin_type T = { CST_BuiltinType };
+            T.Type = TYPE_BOOL;
+            return PushNode(Context, T);
+        }
+
+        case MultiTypeList:
+        {
+            cst_node_builtin_type T = { CST_BuiltinType };
+            T.Type = (c_builtin_type_flags)array_at(Parsed, 0);
+            return PushNode(Context, T);
+        }
+
+        case StructOrUnionSpecifier:
+        case EnumSpecifier:
+            return array_at(Parsed, 0);
+
+        default:
+            assert(!"Unexpected child of type specifier!");
+            return NULL;
+    }
+}
+
+PARSE_FUNC(parse_Declarator, Context, Tokens, Parsed) {
+    cst_node_declaration Decl = { CST_Declaration };
+    cst_node_declaration* Result;
+    cst_node Direct;
+    if (Tokens.Length == 2) {
+        // Combine the pointer declaration with the rest of the declaration
+        Result = (cst_node_declaration*)array_at(Parsed, 0);
+        Direct = array_at(Parsed, 1);
+    } else {
+        Result = (cst_node_declaration*)PushNode(Context, Decl);
+        Direct = array_at(Parsed, 0);
+    }
+
+    switch (*(cst_node_type*)Direct) {
+        case CST_Identifier:
+            Result->Name = (cst_node_identifier*)Direct;
+            break;
+        case CST_FunctionType:
+        case CST_ArrayType:
+            //TODO
+            return Direct;
+        default:
+            assert(!"TODO");
+            break;
+    }
+    return Result;
+}
+
+PARSE_FUNC(parse_Pointer, Context, Tokens, Parsed) {
+    if (Tokens.Length == 1) {
+        cst_node_declaration PointerNode = { CST_Declaration };
+        PointerNode.PointerLevel = array_init(cst_declaration_flags, 1, 0);
+        return PushNode(Context, PointerNode);
+    } 
+    else if (Tokens.Length == 2 && array_at(Tokens, 1).Type == TypeQualifierList) {
+        cst_node_declaration PointerNode = { CST_Declaration };
+        PointerNode.PointerLevel = array_init(cst_declaration_flags, 1, 
+                                              (cst_declaration_flags)array_at(Parsed, 1));
+        return PushNode(Context, PointerNode);
+    } 
+    else if (Tokens.Length == 2 && array_at(Tokens, 1).Type == Pointer) {
+        cst_node_declaration* PointerNode = (cst_node_declaration*)array_at(Parsed, 1);
+        array_insert(cst_declaration_flags, &PointerNode->PointerLevel, 0, 0);
+        return PointerNode;
+    } else {
+        cst_node_declaration* PointerNode = (cst_node_declaration*)array_at(Parsed, 2);
+        array_insert(cst_declaration_flags, 
+                     &PointerNode->PointerLevel, 
+                     (cst_declaration_flags)array_at(Parsed, 1), 
+                     0);
+        return PointerNode;
+    }
+}
+
+PARSE_FUNC(parse_TypeQualifierList, Context, Tokens, Parsed) {
+    if(array_at(Tokens, 0).Type == TypeQualifierList) {
+        return array_at(Parsed, 0);
+    } else {
+        return (void*)((cst_declaration_flags)array_at(Parsed, 0) | 
+                       (cst_declaration_flags)array_at(Parsed, 1));
+    }
+}
+
+PARSE_FUNC(parse_MultiTypeList, Context, Tokens, Parsed) {
+    if(array_at(Tokens, 0).Type == MultiType) {
+        return array_at(Parsed, 0);
+    } else {
+        return (void*)((c_builtin_type_flags)array_at(Parsed, 0) | 
+                       (c_builtin_type_flags)array_at(Parsed, 1));
+    }
+}
+
+PARSE_FUNC(parse_StructuredType, Context, Tokens, Parsed) 
+{
+    cst_node_structured_type Node = { CST_StructuredType };
+    Node.IsUnion = ((uintptr_t)array_at(Parsed, 0) == UNION);
+    //TODO
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_ArrayDecl, Context, Tokens, Parsed) {
+    cst_node_array_type Node = { CST_ArrayType };
+    //TODO
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_FunctionDecl, Context, Tokens, Parsed) {
+    cst_node_array_type Node = { CST_FunctionType };
     //TODO
     return PushNode(Context, Node);
 }
@@ -218,6 +395,7 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, ConstantExpression,  ConditionalExpression),
 
         /* § A.2.2 Declarations */
+        // TODO why is this rule here
         GrammarRule(parse_Declaration, Declaration,  DeclarationSpecifiers, Semicolon),
         GrammarRule(parse_Declaration, Declaration,  DeclarationSpecifiers, InitDeclaratorList, Semicolon),
 
@@ -233,11 +411,11 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_DeclQualifiers, DeclarationQualifiers,  FunctionSpecifier),
         GrammarRule(parse_DeclQualifiers, DeclarationQualifiers,  FunctionSpecifier, DeclarationQualifiers),
 
-        GrammarRule(parse_ruleX, InitDeclaratorList,  InitDeclarator),
-        GrammarRule(parse_ruleX, InitDeclaratorList,  InitDeclaratorList, Comma, InitDeclarator),
+        GrammarRule(parse_InitDeclaratorList, InitDeclaratorList,  InitDeclarator),
+        GrammarRule(parse_InitDeclaratorList, InitDeclaratorList,  InitDeclaratorList, Comma, InitDeclarator),
 
-        GrammarRule(parse_ruleX, InitDeclarator,  Declarator),
-        GrammarRule(parse_ruleX, InitDeclarator,  Declarator, Assign, Initializer),
+        GrammarRule(parse_Passthrough,    InitDeclarator,  Declarator),
+        GrammarRule(parse_InitDeclarator, InitDeclarator,  Declarator, Assign, Initializer),
 
         GrammarRule(parse_TYPEDEF, StorageClassSpecifier,  TYPEDEF),
         GrammarRule(parse_EXTERN, StorageClassSpecifier,  EXTERN),
@@ -247,35 +425,35 @@ cf_grammar GenerateGrammar()
 
         GrammarRule(parse_TypeSpecifier, TypeSpecifier,  VOID),
         GrammarRule(parse_TypeSpecifier, TypeSpecifier,  _BOOL),
-        GrammarRule(parse_TypeSpecifier, TypeSpecifier,  _COMPLEX),
         GrammarRule(parse_TypeSpecifier, TypeSpecifier,  MultiTypeList),
         GrammarRule(parse_TypeSpecifier, TypeSpecifier,  StructOrUnionSpecifier),
         GrammarRule(parse_TypeSpecifier, TypeSpecifier,  EnumSpecifier),
-        GrammarRule(parse_TypeSpecifier, TypeSpecifier,  Identifier),
+        GrammarRule(parse_Identifier,    TypeSpecifier,  Identifier),
 
         // Added to the grammar to account for type names like "unsigned long long Foo"
         // being valid, but type names like "foo bar Foo" being probably invalid
         // and causing problems with parsing
         // {
-        GrammarRule(parse_ruleX, MultiTypeList,  MultiType),
-        GrammarRule(parse_ruleX, MultiTypeList,  MultiTypeList, MultiType),
+        GrammarRule(parse_MultiTypeList, MultiTypeList,  MultiType),
+        GrammarRule(parse_MultiTypeList, MultiTypeList,  MultiTypeList, MultiType),
 
-        GrammarRule(parse_ruleX, MultiType,  CHAR),
-        GrammarRule(parse_ruleX, MultiType,  SHORT),
-        GrammarRule(parse_ruleX, MultiType,  INT),
-        GrammarRule(parse_ruleX, MultiType,  LONG),
-        GrammarRule(parse_ruleX, MultiType,  FLOAT),
-        GrammarRule(parse_ruleX, MultiType,  DOUBLE),
-        GrammarRule(parse_ruleX, MultiType,  SIGNED),
-        GrammarRule(parse_ruleX, MultiType,  UNSIGNED),
+        GrammarRule(parse_CHAR,     MultiType,  CHAR),
+        GrammarRule(parse_SHORT,    MultiType,  SHORT),
+        GrammarRule(parse_INT,      MultiType,  INT),
+        GrammarRule(parse_LONG,     MultiType,  LONG),
+        GrammarRule(parse_SIGNED,   MultiType,  SIGNED),
+        GrammarRule(parse_UNSIGNED, MultiType,  UNSIGNED),
+        GrammarRule(parse_FLOAT,    MultiType,  FLOAT),
+        GrammarRule(parse_DOUBLE,   MultiType,  DOUBLE),
+        GrammarRule(parse_COMPLEX,  MultiType,  _COMPLEX),
         // }
 
-        GrammarRule(parse_ruleX, StructOrUnionSpecifier,  StructOrUnion, LCurly, StructDeclarationList, RCurly),
-        GrammarRule(parse_ruleX, StructOrUnionSpecifier,  StructOrUnion, Identifier, LBracket, StructDeclarationList, RBracket),
-        GrammarRule(parse_ruleX, StructOrUnionSpecifier,  StructOrUnion, Identifier),
+        GrammarRule(parse_StructuredType, StructOrUnionSpecifier,  StructOrUnion, LCurly, StructDeclarationList, RCurly),
+        GrammarRule(parse_StructuredType, StructOrUnionSpecifier,  StructOrUnion, Identifier, LBracket, StructDeclarationList, RBracket),
+        GrammarRule(parse_StructuredType, StructOrUnionSpecifier,  StructOrUnion, Identifier),
 
-        GrammarRule(parse_ruleX, StructOrUnion,  STRUCT),
-        GrammarRule(parse_ruleX, StructOrUnion,  UNION),
+        GrammarRule(parse_PassthroughTokenType, StructOrUnion,  STRUCT),
+        GrammarRule(parse_PassthroughTokenType, StructOrUnion,  UNION),
 
         GrammarRule(parse_ruleX, StructDeclarationList,  StructDeclaration),
         GrammarRule(parse_ruleX, StructDeclarationList,  StructDeclarationList, StructDeclaration),
@@ -298,7 +476,7 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, Identifier, LCurly, EnumeratorList, RCurly),
         GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, LCurly, EnumeratorList, Comma, RCurly),
         GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, Identifier, LCurly, EnumeratorList, Comma, RCurly),
-        GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, Identifier),
+        GrammarRule(parse_Identifier, EnumSpecifier,  ENUM, Identifier),
 
         GrammarRule(parse_ruleX, EnumeratorList,  Enumerator),
         GrammarRule(parse_ruleX, EnumeratorList,  EnumeratorList, Comma, Enumerator),
@@ -312,30 +490,30 @@ cf_grammar GenerateGrammar()
 
         GrammarRule(parse_INLINE, FunctionSpecifier,  INLINE),
 
-        GrammarRule(parse_ruleX, Declarator,  DirectDeclarator),
-        GrammarRule(parse_ruleX, Declarator,  Pointer, DirectDeclarator),
+        GrammarRule(parse_Declarator, Declarator,  DirectDeclarator),
+        GrammarRule(parse_Declarator, Declarator,  Pointer, DirectDeclarator),
 
-        GrammarRule(parse_ruleX, DirectDeclarator,  Identifier),
+        GrammarRule(parse_Identifier, DirectDeclarator,  Identifier),
         GrammarRule(parse_ruleX, DirectDeclarator,  LParen, Declarator, RParen),
-        GrammarRule(parse_ruleX, DirectDeclarator,  DirectDeclarator, LBracket, RBracket),
-        GrammarRule(parse_ruleX, DirectDeclarator,  DirectDeclarator, LBracket, AssignmentExpression, RBracket),
-        GrammarRule(parse_ruleX, DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, RBracket),
-        GrammarRule(parse_ruleX, DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, AssignmentExpression, RBracket),
-        GrammarRule(parse_ruleX, DirectDeclarator,  DirectDeclarator, LBracket, STATIC, AssignmentExpression, RBracket),
-        GrammarRule(parse_ruleX, DirectDeclarator,  DirectDeclarator, LBracket, STATIC, TypeQualifierList, AssignmentExpression, RBracket),
-        GrammarRule(parse_ruleX, DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, STATIC, AssignmentExpression, RBracket),
-        GrammarRule(parse_ruleX, DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, Asterisk, RBracket),
-        GrammarRule(parse_ruleX, DirectDeclarator,  DirectDeclarator, LParen, ParameterTypeList, RParen),
-        GrammarRule(parse_ruleX, DirectDeclarator,  DirectDeclarator, LParen, RParen),
-        GrammarRule(parse_ruleX, DirectDeclarator,  DirectDeclarator, LParen, IdentifierList, RParen),
+        GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, RBracket),
+        GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, AssignmentExpression, RBracket),
+        GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, RBracket),
+        GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, AssignmentExpression, RBracket),
+        GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, STATIC, AssignmentExpression, RBracket),
+        GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, STATIC, TypeQualifierList, AssignmentExpression, RBracket),
+        GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, STATIC, AssignmentExpression, RBracket),
+        GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, Asterisk, RBracket),
+        GrammarRule(parse_FunctionDecl, DirectDeclarator,  DirectDeclarator, LParen, ParameterTypeList, RParen),
+        GrammarRule(parse_FunctionDecl, DirectDeclarator,  DirectDeclarator, LParen, RParen),
+        GrammarRule(parse_FunctionDecl, DirectDeclarator,  DirectDeclarator, LParen, IdentifierList, RParen),
 
-        GrammarRule(parse_ruleX, Pointer,  Asterisk),
-        GrammarRule(parse_ruleX, Pointer,  Asterisk, TypeQualifierList),
-        GrammarRule(parse_ruleX, Pointer,  Asterisk, Pointer),
-        GrammarRule(parse_ruleX, Pointer,  Asterisk, TypeQualifierList, Pointer),
+        GrammarRule(parse_Pointer, Pointer,  Asterisk),
+        GrammarRule(parse_Pointer, Pointer,  Asterisk, TypeQualifierList),
+        GrammarRule(parse_Pointer, Pointer,  Asterisk, Pointer),
+        GrammarRule(parse_Pointer, Pointer,  Asterisk, TypeQualifierList, Pointer),
 
-        GrammarRule(parse_ruleX, TypeQualifierList,  TypeQualifier),
-        GrammarRule(parse_ruleX, TypeQualifierList,  TypeQualifierList, TypeQualifier),
+        GrammarRule(parse_TypeQualifierList, TypeQualifierList,  TypeQualifier),
+        GrammarRule(parse_TypeQualifierList, TypeQualifierList,  TypeQualifierList, TypeQualifier),
 
         GrammarRule(parse_ruleX, ParameterTypeList,  ParameterList),
         GrammarRule(parse_ruleX, ParameterTypeList,  ParameterList, Comma, Ellipses),

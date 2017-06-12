@@ -56,7 +56,7 @@ void WalkTree(lst_node* Node, int Tab) {
 }
 #endif
 
-void WalkTree(cst_node* Node, int Tab, bool Inline) {
+void WalkTree(cst_node Node, int Tab, bool Inline) {
     if (!Inline) for (int i = 0; i < Tab; ++i) printf("  ");
 
     if (Node == NULL) {
@@ -71,9 +71,11 @@ void WalkTree(cst_node* Node, int Tab, bool Inline) {
                 WalkTree(Decl, Tab + 1, false);
             }
             break;
-        case CST_FunctionDefinition:
-            printf("some kind of function definition\n");
+            
+        case CST_FunctionType:
+            printf("some kind of function declaration\n");
             break;
+
         case CST_Declaration:
         {
             cst_node_declaration* Decl = (cst_node_declaration*)Node;
@@ -86,13 +88,36 @@ void WalkTree(cst_node* Node, int Tab, bool Inline) {
             if (Decl->SpecifierFlags & DECL_RESTRICT) printf("restrict ");
             if (Decl->SpecifierFlags & DECL_VOLATILE) printf("volatile ");
             if (Decl->SpecifierFlags & DECL_INLINE) printf("inline ");
-            printf("<declaration>");
+            WalkTree(Decl->BaseType, Tab + 1, true);
+            array_for(cst_declaration_flags, Pointer, Decl->PointerLevel) {
+                printf("* ");
+                if (Pointer & DECL_CONST) printf("const ");
+                if (Pointer & DECL_RESTRICT) printf("restrict ");
+                if (Pointer & DECL_VOLATILE) printf("volatile ");
+            }
             if (!Inline) printf("\n");
         } break;
+
         case CST_DeclarationList:
-            printf("some kind of declaration list\n");
-            break;
+        {
+            cst_node_declaration_list* List = (cst_node_declaration_list*)Node;
+            printf("declaration list:");
+            if (!Inline) printf("\n");
+            array_for(cst_node, Decl, List->Declarations) {
+                WalkTree(Decl, Tab + 1, false);
+            }
+        } break;
+
+        case CST_Identifier:
+        {
+            cst_node_identifier* Ident = (cst_node_identifier*)Node;
+            printf("%.*s", Ident->TextLength, Ident->Text);
+            if (!Inline) printf("\n");
+        } break;
+
         default:
+            printf("unhandled node %s", NodeNameStr((cf_symbol_t)*(cst_node_type*)Node));
+            if (!Inline) printf("\n");
             break;
     }
 }

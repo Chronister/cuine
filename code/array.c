@@ -21,10 +21,11 @@
 // NOTE DO NOT TRY TO PUSH TO A WRAPPED ARRAY
 #define array_wrap(T, n, data) T ## _Array_Wrap(n, data)
 #define array_init(T, n, ...) T ## _Array_Init(n, __VA_ARGS__)
-#define array_free(T, A) T ## _Array_Free(A)
 #define array_grow(T, A, NewCapacity) T ## _Array_Grow(A, NewCapacity)
+#define array_free(T, A) T ## _Array_Free(A)
 
 #define array_push(T, A, I) T ## _Array_Push(A, I)
+#define array_insert(T, A, I, n) T ## _Array_Insert(A, I, n)
 #define array_push_all(T, A, B) T ## _Array_PushAll(A, B)
 #define array_pop(T, A) T ## _Array_Pop(A)
 #define array_peek(T, A) T ## _Array_Peek(A)
@@ -32,7 +33,7 @@
 #endif
 
 typedef struct {
-    // Invariant: Data is either NULL or allocated with malloc
+    // Invariant: 
     //            Data block size is Capacity * sizeof(a)
     //            Length <= Capacity
     a* Data;
@@ -85,6 +86,19 @@ a* IDCAT(a, _Array_Push) (array(a)* A, a Item)
 
     A->Data[A->Length++] = Item;
     return A->Data + (A->Length - 1);
+}
+
+a* IDCAT(a, _Array_Insert) (array(a)* A, a Item, int Index)
+{
+    if (Index < 0) Index += A->Length;
+    if (Index < 0 || Index > A->Length) return NULL;
+
+    if (A->Data == NULL || A->Length + 1 >= A->Capacity)
+        IDCAT(a, _Array_Grow)(A, MAX(A->Capacity * 2, 10));
+
+    memmove(A->Data + Index + 1, A->Data + Index, A->Length - Index);
+    A->Data[Index] = Item;
+    return A->Data + Index;
 }
 
 a* IDCAT(a, _Array_PushAll) (array(a)* A, array(a) B)

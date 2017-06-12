@@ -5,7 +5,7 @@ static const char* quux = "quux";
 
 typedef int int32_t;
 
-long long foo(int bar);
+//long long foo(int bar);
 
 int main(int argc, char* argv) {
     int x = 5;

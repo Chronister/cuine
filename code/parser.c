@@ -6,6 +6,7 @@
 #include "parser.h"
 
 #define PRINT_SLR_TABLES 0
+#define PRINT_SLR_ACTIONS 1
 
 #define GrammarRule(ParseFunc, Nonterminal, ...) _GrammarRule(ParseFunc, Nonterminal, ##__VA_ARGS__, TerminalMIN)
 #define GETRULE(Grammar, N) (Grammar)->Productions.Data[N]
@@ -555,7 +556,11 @@ void* Parse(tokenizer* Tokenizer)
 
         switch(Action.Type) {
             case T_SHIFT: {
-                //printf("Shift %d -> %d on %s\n", State, (int)Action.State, SymbolStr(Token.Type));
+#if PRINT_SLR_ACTIONS
+                printf("Shift %d -> %d on %s", State, (int)Action.State, SymbolStr(Token.Type));
+                if (Token.Type == Identifier) printf("(%.*s)", Token.TextLength, Token.Text);
+                printf("\n");
+#endif
 
                 lr_stack_item Pair = { Token, State, NULL };
                 array_push(lr_stack_item, &Stack, Pair);
@@ -568,15 +573,19 @@ void* Parse(tokenizer* Tokenizer)
             } break;
 
             case T_GOTO: {
-                //printf("Goto %d -> %d\n", State, (int)Action.State);
+#if PRINT_SLR_ACTIONS
+                printf("Goto %d -> %d\n", State, (int)Action.State);
+#endif
                 State = Action.State;
                 Token = (token){ .Type = TerminalMIN };
             } break;
 
             case T_REDUCE: {
-                //printf("Reduce rule %d ", (int)Action.RuleNum);
-                //PrintRule(stdout, &Grammar, Action.RuleNum);
-                //printf("\n");
+#if PRINT_SLR_ACTIONS
+                printf("Reduce rule %d ", (int)Action.RuleNum);
+                PrintRule(stdout, &Grammar, Action.RuleNum);
+                printf("\n");
+#endif
                 cf_production Rule = Grammar.Productions.Data[Action.RuleNum];
                 token Tokens[CF_MAX_SYMBOLS_PER_RULE];
                 void* Parsed[CF_MAX_SYMBOLS_PER_RULE];

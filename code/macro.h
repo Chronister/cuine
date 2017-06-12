@@ -9,6 +9,8 @@
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 
+#define FLAG(n) ((1) << (n))
+
 #define countof(x) ((sizeof((x)))/sizeof((x)[0]))
 
 #if defined(__GNUC__)
