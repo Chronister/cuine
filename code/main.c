@@ -60,20 +60,32 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
     if (!Inline) for (int i = 0; i < Tab; ++i) printf("  ");
 
     if (Node == NULL) {
-        printf("(null)"); 
+        printf("null"); 
         if (!Inline) printf("\n");
         return;
     }
     switch(*(cst_node_type*)Node) {
         case CST_TranslationUnit:
-            printf("Translation Unit 1:\n");
+            printf("translation unit:");
+            if (!Inline) printf("\n");
             array_for(cst_node, Decl, ((cst_node_translation_unit*)Node)->ExternDecls) {
                 WalkTree(Decl, Tab + 1, false);
             }
+            if (!Inline) printf("\n");
             break;
             
         case CST_FunctionType:
-            printf("some kind of function declaration\n");
+            cst_node_function_type* Func = (cst_node_function_type*)Node;
+            printf("function () ");
+            if (!Inline) printf("\n");
+            WalkTree(Func->Body, Tab, false);
+            break;
+
+        case CST_Block:
+            if (!Inline) printf("\n");
+            array_for(cst_node, Stmt, ((cst_node_block*)Node)->Statements) {
+                WalkTree(Stmt, Tab + 1, false);
+            }
             break;
 
         case CST_Declaration:
@@ -113,7 +125,6 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
         {
             cst_node_identifier* Ident = (cst_node_identifier*)Node;
             printf("%.*s", Ident->TextLength, Ident->Text);
-            if (!Inline) printf("\n");
         } break;
 
         case CST_BuiltinType:
@@ -131,13 +142,10 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
             if (TypeNode->Type & TYPE_FLOAT) printf("float ");
             if (TypeNode->Type & TYPE_DOUBLE) printf("double ");
             if (TypeNode->Type & TYPE_COMPLEX) printf("_Complex ");
-
-            if (!Inline) printf("\n");
         } break;
 
         default:
             printf("unhandled node %s", NodeNameStr((cf_symbol_t)*(cst_node_type*)Node));
-            if (!Inline) printf("\n");
             break;
     }
 }

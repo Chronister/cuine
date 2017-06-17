@@ -48,6 +48,16 @@ PARSE_FUNC(parse_ExternDecl, Context, Tokens, Parsed) {
 PARSE_FUNC(parse_FunctionDefn, Context, Tokens, Parsed) {
     cst_node_function_type Node = { CST_FunctionType };
     //TODO
+    cst_node_block* Block = NULL;
+    if (Tokens.Length == 3) {
+        Block = (cst_node_block*)array_at(Parsed, 2);
+    }
+    else if (Tokens.Length == 4) {
+        Block = (cst_node_block*)array_at(Parsed, 3);
+    }
+    else_invalid;
+
+    Node.Body = Block;
     return PushNode(Context, Node);
 }
 
@@ -70,11 +80,13 @@ PARSE_FUNC(parse_InitDeclaratorList, Context, Tokens, Parsed) {
         List.Declarations = array_init(cst_node, 1, array_at(Parsed, 0));
         return PushNode(Context, List);
     }
-    else { // Tokens.Length == 3
+    else if (Tokens.Length == 3) {
         cst_node_declaration_list* List = array_at(Parsed, 0);
         array_push(cst_node, &List->Declarations, array_at(Parsed, 2));
         return List;
     }
+    else_invalid;
+    return NULL;
 }
 
 PARSE_FUNC(parse_Declaration, Context, Tokens, Parsed) {
@@ -91,10 +103,12 @@ PARSE_FUNC(parse_Declaration, Context, Tokens, Parsed) {
         }
         // free(DeclSpecifiers);
         return List;
-    } else {
+    } else if (Tokens.Length == 2) {
         assert(!"that rule you were confused by was hit");
         return NULL;
     }
+    else_invalid;
+    return NULL;
 }
 
 PARSE_FUNC(parse_DeclSpecifiers, Context, Tokens, Parsed) {
@@ -273,6 +287,32 @@ PARSE_FUNC(parse_FunctionDecl, Context, Tokens, Parsed) {
     cst_node_array_type Node = { CST_FunctionType };
     //TODO
     return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_CompoundStmt, Context, Tokens, Parsed) {
+    if (Tokens.Length == 2) {
+        cst_node_block Block = { CST_Block };
+        return PushNode(Context, Block);
+    }
+    else if (Tokens.Length == 3) {
+        return array_at(Parsed, 1);
+    }
+    else_invalid;
+    return NULL;
+}
+
+PARSE_FUNC(parse_BlockItemList, Context, Tokens, Parsed) {
+    if (Tokens.Length == 1) {
+        cst_node_block Block = { CST_Block };
+        Block.Statements = array_init(cst_node, 1, array_at(Parsed, 0));
+        return PushNode(Context, Block);
+    } else if (Tokens.Length == 2) {
+        cst_node_block* Block = (cst_node_block*)array_at(Parsed, 0);
+        array_push(cst_node, &Block->Statements, array_at(Parsed, 1));
+        return Block;
+    }
+    else_invalid;
+    return NULL;
 }
 
 PARSE_FUNC(parse_ruleX, Context, Tokens, Parsed) {
@@ -594,14 +634,14 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, LabeledStatement,  CASE, ConstantExpression, Colon, Statement),
         GrammarRule(parse_ruleX, LabeledStatement,  DEFAULT, Colon, Statement),
 
-        GrammarRule(parse_ruleX, CompoundStatement,  LCurly, RCurly),
-        GrammarRule(parse_ruleX, CompoundStatement,  LCurly, BlockItemList, RCurly),
+        GrammarRule(parse_CompoundStmt, CompoundStatement,  LCurly, RCurly),
+        GrammarRule(parse_CompoundStmt, CompoundStatement,  LCurly, BlockItemList, RCurly),
 
-        GrammarRule(parse_ruleX, BlockItemList,  BlockItem),
-        GrammarRule(parse_ruleX, BlockItemList,  BlockItemList, BlockItem),
+        GrammarRule(parse_BlockItemList, BlockItemList,  BlockItem),
+        GrammarRule(parse_BlockItemList, BlockItemList,  BlockItemList, BlockItem),
 
-        GrammarRule(parse_ruleX, BlockItem,  Declaration),
-        GrammarRule(parse_ruleX, BlockItem,  Statement),
+        GrammarRule(parse_Passthrough, BlockItem,  Declaration),
+        GrammarRule(parse_Passthrough, BlockItem,  Statement),
 
         GrammarRule(parse_ruleX, ExpressionStatement,  Semicolon),
         GrammarRule(parse_ruleX, ExpressionStatement,  Expression, Semicolon),

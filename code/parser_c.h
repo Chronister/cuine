@@ -19,6 +19,8 @@
     X(FunctionType),        \
     X(Declaration),         \
     X(DeclarationList),     \
+    X(Block),               \
+    X(Statement),           \
     X(TranslationUnit),
 
 #define CST_(x) CST_##x
@@ -90,7 +92,14 @@ typedef struct {
 typedef struct {
     cst_node_header Header;
 
+    array(cst_node) Statements; // CST_Statement or CST_Declaration
+} cst_node_block;
+
+typedef struct {
+    cst_node_header Header;
+
     // TODO
+    cst_node_block* Body; // NULL if this is a declaration
 } cst_node_function_type;
 
 typedef enum {

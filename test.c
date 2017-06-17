@@ -7,11 +7,11 @@ static volatile const int * const * const volatile ** restrict volatile *foo;
 
 typedef int int32_t;
 
-//long long foo(int bar);
+long long foo(int bar);
 
 int main(int argc, char* argv) {
-    int x = 5;
-    int y = 10;
+    register int x = 5;
+    auto int y = 10;
     if (x + y > 16) {
         int z = 7;
         x = z - y;
