@@ -21,6 +21,11 @@
     X(DeclarationList),     \
     X(Block),               \
     X(Statement),           \
+    X(StringConstant),      \
+    X(IntegerConstant),     \
+    X(FloatingConstant),    \
+    X(CharacterConstant),   \
+    X(BinaryOperator),      \
     X(TranslationUnit),
 
 #define CST_(x) CST_##x
@@ -154,6 +159,39 @@ typedef struct {
     cst_node_header Header;
     array(cst_node) Declarations;
 } cst_node_declaration_list;
+
+typedef struct {
+    cst_node_header Header;
+
+    const char* Text;
+    int TextLength;
+} cst_node_string_constant;
+
+typedef struct {
+    cst_node_header Header;
+
+    uint64_t Value;
+} cst_node_integer_constant;
+
+typedef struct {
+    cst_node_header Header;
+
+    double Value;
+} cst_node_float_constant;
+
+typedef struct {
+    cst_node_header Header;
+
+    int Value;
+} cst_node_char_constant;
+
+typedef struct {
+    cst_node_header Header;
+
+    cf_symbol_t Operation;
+    cst_node Left;
+    cst_node Right;
+} cst_node_binary_operator;
 
 typedef struct {
     void* Memory;

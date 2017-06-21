@@ -157,6 +157,7 @@ PARSE_FUNC(parse_COMPLEX,  Context, Tokens, Parsed) { return (void*)(c_builtin_t
 // Passes through the token type as the data "pointer"
 PARSE_FUNC(parse_PassthroughTokenType,  Context, Tokens, Parsed) { return (void*)(uintptr_t)array_at(Tokens, 0).Type; }
 PARSE_FUNC(parse_Passthrough,  Context, Tokens, Parsed) { return array_at(Parsed, 0); }
+PARSE_FUNC(parse_PassthroughSecond,  Context, Tokens, Parsed) { return array_at(Parsed, 1); }
 
 PARSE_FUNC(parse_Identifier, Context, Tokens, Parsed) { 
     cst_node_identifier Iden = { CST_Identifier };
@@ -315,6 +316,45 @@ PARSE_FUNC(parse_BlockItemList, Context, Tokens, Parsed) {
     return NULL;
 }
 
+PARSE_FUNC(parse_StringLiteral, Context, Tokens, Parsed) {
+    cst_node_string_constant Node = { CST_StringConstant };
+    Node.Text = array_at(Tokens, 0).Text;
+    Node.TextLength = array_at(Tokens, 0).TextLength;
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_IntegerConstant, Context, Tokens, Parsed) {
+    // TODO integer parsing
+    cst_node_string_constant Node = { CST_StringConstant };
+    Node.Text = array_at(Tokens, 0).Text;
+    Node.TextLength = array_at(Tokens, 0).TextLength;
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_FloatingConstant, Context, Tokens, Parsed) {
+    // TODO float parsing
+    cst_node_string_constant Node = { CST_StringConstant };
+    Node.Text = array_at(Tokens, 0).Text;
+    Node.TextLength = array_at(Tokens, 0).TextLength;
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_CharacterConstant, Context, Tokens, Parsed) {
+    // TODO char parsing
+    cst_node_string_constant Node = { CST_StringConstant };
+    Node.Text = array_at(Tokens, 0).Text;
+    Node.TextLength = array_at(Tokens, 0).TextLength;
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_BinaryExpression, Context, Tokens, Parsed) {
+    cst_node_binary_operator Node = { CST_BinaryOperator };
+    Node.Operation = array_at(Tokens, 1).Type;
+    Node.Left = array_at(Parsed, 0);
+    Node.Right = array_at(Parsed, 2);
+    return PushNode(Context, Node);
+}
+
 PARSE_FUNC(parse_ruleX, Context, Tokens, Parsed) {
     //array_for(token, Token, Tokens) {
     //    printf("\tTokens[%d]: %s\n", TokenIndex, SymbolStr(Token.Type));
@@ -330,20 +370,17 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_SourceFile, SourceFile,  TranslationUnit, EndOfFile),
 
         /* § A.1.5 Constants*/
-        GrammarRule(parse_ruleX, Constant,  IntegerConstant),
-        GrammarRule(parse_ruleX, Constant,  FloatingConstant),
-        // x GrammarRule(parse_ruleX, Constant,  EnumerationConstant),
-        GrammarRule(parse_ruleX, Constant,  CharacterConstant),
-
-        // x GrammarRule(parse_ruleX, EnumerationConstant,  Identifier),
+        GrammarRule(parse_IntegerConstant, Constant,  IntegerConstant),
+        GrammarRule(parse_FloatingConstant, Constant,  FloatingConstant),
+        GrammarRule(parse_CharacterConstant, Constant,  CharacterConstant),
 
         /* § A.2.1 Expressions */
-        GrammarRule(parse_ruleX, PrimaryExpression,  Identifier),
-        GrammarRule(parse_ruleX, PrimaryExpression,  Constant),
-        GrammarRule(parse_ruleX, PrimaryExpression,  StringLiteral),
-        GrammarRule(parse_ruleX, PrimaryExpression,  LParen, Expression, RParen),
+        GrammarRule(parse_Identifier, PrimaryExpression,  Identifier),
+        GrammarRule(parse_StringLiteral, PrimaryExpression,  StringLiteral),
+        GrammarRule(parse_Passthrough, PrimaryExpression,  Constant),
+        GrammarRule(parse_PassthroughSecond, PrimaryExpression,  LParen, Expression, RParen),
 
-        GrammarRule(parse_ruleX, PostfixExpression,  PrimaryExpression),
+        GrammarRule(parse_Passthrough, PostfixExpression,  PrimaryExpression),
         GrammarRule(parse_ruleX, PostfixExpression,  PostfixExpression, LBracket, Expression, RBracket),
         GrammarRule(parse_ruleX, PostfixExpression,  PostfixExpression, LParen, RParen),
         GrammarRule(parse_ruleX, PostfixExpression,  PostfixExpression, LParen, ArgumentExpressionList, RParen),
@@ -354,10 +391,10 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, PostfixExpression,  LParen, TypeName, RParen, LCurly, InitializerList, RCurly),
         GrammarRule(parse_ruleX, PostfixExpression,  LParen, TypeName, RParen, LCurly, InitializerList, RCurly, Comma),
 
-        GrammarRule(parse_ruleX, ArgumentExpressionList,  AssignmentExpression),
+        GrammarRule(parse_Passthrough, ArgumentExpressionList,  AssignmentExpression),
         GrammarRule(parse_ruleX, ArgumentExpressionList,  ArgumentExpressionList, AssignmentExpression),
 
-        GrammarRule(parse_ruleX, UnaryExpression,  PostfixExpression),
+        GrammarRule(parse_Passthrough, UnaryExpression,  PostfixExpression),
         GrammarRule(parse_ruleX, UnaryExpression,  Increment, UnaryExpression),
         GrammarRule(parse_ruleX, UnaryExpression,  Decrement, UnaryExpression),
         GrammarRule(parse_ruleX, UnaryExpression,  UnaryOperator, CastExpression),
@@ -371,51 +408,51 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, UnaryOperator,  BitNot),
         GrammarRule(parse_ruleX, UnaryOperator,  LogicNot),
 
-        GrammarRule(parse_ruleX, CastExpression,  UnaryExpression),
+        GrammarRule(parse_Passthrough, CastExpression,  UnaryExpression),
         GrammarRule(parse_ruleX, CastExpression,  LParen, TypeName, RParen, CastExpression),
 
-        GrammarRule(parse_ruleX, MultiplicativeExpression,  CastExpression),
-        GrammarRule(parse_ruleX, MultiplicativeExpression,  MultiplicativeExpression, Asterisk, CastExpression),
-        GrammarRule(parse_ruleX, MultiplicativeExpression,  MultiplicativeExpression, Divide, CastExpression),
-        GrammarRule(parse_ruleX, MultiplicativeExpression,  MultiplicativeExpression, Modulus, CastExpression),
+        GrammarRule(parse_Passthrough, MultiplicativeExpression,  CastExpression),
+        GrammarRule(parse_BinaryExpression, MultiplicativeExpression,  MultiplicativeExpression, Asterisk, CastExpression),
+        GrammarRule(parse_BinaryExpression, MultiplicativeExpression,  MultiplicativeExpression, Divide, CastExpression),
+        GrammarRule(parse_BinaryExpression, MultiplicativeExpression,  MultiplicativeExpression, Modulus, CastExpression),
 
-        GrammarRule(parse_ruleX, AdditiveExpression,  MultiplicativeExpression),
-        GrammarRule(parse_ruleX, AdditiveExpression,  AdditiveExpression, Plus, MultiplicativeExpression),
-        GrammarRule(parse_ruleX, AdditiveExpression,  AdditiveExpression, Minus, MultiplicativeExpression),
+        GrammarRule(parse_Passthrough, AdditiveExpression,  MultiplicativeExpression),
+        GrammarRule(parse_BinaryExpression, AdditiveExpression,  AdditiveExpression, Plus, MultiplicativeExpression),
+        GrammarRule(parse_BinaryExpression, AdditiveExpression,  AdditiveExpression, Minus, MultiplicativeExpression),
 
-        GrammarRule(parse_ruleX, ShiftExpression,  AdditiveExpression),
-        GrammarRule(parse_ruleX, ShiftExpression,  ShiftExpression, LBitShift, AdditiveExpression),
-        GrammarRule(parse_ruleX, ShiftExpression,  ShiftExpression, RBitShift, AdditiveExpression),
+        GrammarRule(parse_Passthrough, ShiftExpression,  AdditiveExpression),
+        GrammarRule(parse_BinaryExpression, ShiftExpression,  ShiftExpression, LBitShift, AdditiveExpression),
+        GrammarRule(parse_BinaryExpression, ShiftExpression,  ShiftExpression, RBitShift, AdditiveExpression),
 
-        GrammarRule(parse_ruleX, RelationalExpression,  ShiftExpression),
-        GrammarRule(parse_ruleX, RelationalExpression,  RelationalExpression, Less, ShiftExpression),
-        GrammarRule(parse_ruleX, RelationalExpression,  RelationalExpression, Greater, ShiftExpression),
-        GrammarRule(parse_ruleX, RelationalExpression,  RelationalExpression, LessEquals, ShiftExpression),
-        GrammarRule(parse_ruleX, RelationalExpression,  RelationalExpression, GreaterEquals, ShiftExpression),
+        GrammarRule(parse_Passthrough, RelationalExpression,  ShiftExpression),
+        GrammarRule(parse_BinaryExpression, RelationalExpression,  RelationalExpression, Less, ShiftExpression),
+        GrammarRule(parse_BinaryExpression, RelationalExpression,  RelationalExpression, Greater, ShiftExpression),
+        GrammarRule(parse_BinaryExpression, RelationalExpression,  RelationalExpression, LessEquals, ShiftExpression),
+        GrammarRule(parse_BinaryExpression, RelationalExpression,  RelationalExpression, GreaterEquals, ShiftExpression),
 
-        GrammarRule(parse_ruleX, EqualityExpression,  RelationalExpression),
-        GrammarRule(parse_ruleX, EqualityExpression,  EqualityExpression, Equals, RelationalExpression),
-        GrammarRule(parse_ruleX, EqualityExpression,  EqualityExpression, LogicNotEquals, RelationalExpression),
+        GrammarRule(parse_Passthrough, EqualityExpression,  RelationalExpression),
+        GrammarRule(parse_BinaryExpression, EqualityExpression,  EqualityExpression, Equals, RelationalExpression),
+        GrammarRule(parse_BinaryExpression, EqualityExpression,  EqualityExpression, LogicNotEquals, RelationalExpression),
 
-        GrammarRule(parse_ruleX, ANDExpression,  EqualityExpression),
-        GrammarRule(parse_ruleX, ANDExpression,  ANDExpression, Ampersand, EqualityExpression),
+        GrammarRule(parse_Passthrough, ANDExpression,  EqualityExpression),
+        GrammarRule(parse_BinaryExpression, ANDExpression,  ANDExpression, Ampersand, EqualityExpression),
 
-        GrammarRule(parse_ruleX, ExclusiveORExpression,  ANDExpression),
-        GrammarRule(parse_ruleX, ExclusiveORExpression,  ExclusiveORExpression, BitXor, ANDExpression),
+        GrammarRule(parse_Passthrough, ExclusiveORExpression,  ANDExpression),
+        GrammarRule(parse_BinaryExpression, ExclusiveORExpression,  ExclusiveORExpression, BitXor, ANDExpression),
 
-        GrammarRule(parse_ruleX, InclusiveORExpression, ExclusiveORExpression),
-        GrammarRule(parse_ruleX, InclusiveORExpression, InclusiveORExpression, BitOr, ANDExpression),
+        GrammarRule(parse_Passthrough, InclusiveORExpression, ExclusiveORExpression),
+        GrammarRule(parse_BinaryExpression, InclusiveORExpression, InclusiveORExpression, BitOr, ANDExpression),
 
-        GrammarRule(parse_ruleX, LogicalANDExpression,  InclusiveORExpression),
-        GrammarRule(parse_ruleX, LogicalANDExpression,  LogicalANDExpression, LogicAnd, InclusiveORExpression),
+        GrammarRule(parse_Passthrough, LogicalANDExpression,  InclusiveORExpression),
+        GrammarRule(parse_BinaryExpression, LogicalANDExpression,  LogicalANDExpression, LogicAnd, InclusiveORExpression),
 
-        GrammarRule(parse_ruleX, LogicalORExpression,  LogicalANDExpression),
-        GrammarRule(parse_ruleX, LogicalORExpression,  LogicalORExpression, LogicOr, LogicalANDExpression),
+        GrammarRule(parse_Passthrough, LogicalORExpression,  LogicalANDExpression),
+        GrammarRule(parse_BinaryExpression, LogicalORExpression,  LogicalORExpression, LogicOr, LogicalANDExpression),
 
-        GrammarRule(parse_ruleX, ConditionalExpression,  LogicalORExpression),
+        GrammarRule(parse_Passthrough, ConditionalExpression,  LogicalORExpression),
         GrammarRule(parse_ruleX, ConditionalExpression,  LogicalORExpression, QuestionMark, Expression, Colon, ConditionalExpression),
 
-        GrammarRule(parse_ruleX, AssignmentExpression,  ConditionalExpression),
+        GrammarRule(parse_Passthrough, AssignmentExpression,  ConditionalExpression),
         GrammarRule(parse_ruleX, AssignmentExpression,  UnaryExpression, AssignmentOperator, AssignmentExpression),
 
         GrammarRule(parse_ruleX, AssignmentOperator,  Assign),
@@ -430,10 +467,10 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, AssignmentOperator,  BitXorEquals),
         GrammarRule(parse_ruleX, AssignmentOperator,  BitOrEquals),
 
-        GrammarRule(parse_ruleX, Expression,  AssignmentExpression),
+        GrammarRule(parse_Passthrough, Expression,  AssignmentExpression),
         GrammarRule(parse_ruleX, Expression,  Expression, Comma, AssignmentExpression),
 
-        GrammarRule(parse_ruleX, ConstantExpression,  ConditionalExpression),
+        GrammarRule(parse_Passthrough, ConstantExpression,  ConditionalExpression),
 
         /* § A.2.2 Declarations */
         // TODO why is this ↓ rule here
@@ -625,7 +662,7 @@ cf_grammar GenerateGrammar()
         /* § A.2.3 Statements */
         GrammarRule(parse_ruleX, Statement,  LabeledStatement),
         GrammarRule(parse_ruleX, Statement,  CompoundStatement),
-        GrammarRule(parse_ruleX, Statement,  ExpressionStatement),
+        GrammarRule(parse_Passthrough, Statement,  ExpressionStatement),
         GrammarRule(parse_ruleX, Statement,  SelectionStatement),
         GrammarRule(parse_ruleX, Statement,  IterationStatement),
         GrammarRule(parse_ruleX, Statement,  JumpStatement),
@@ -644,7 +681,7 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_Passthrough, BlockItem,  Statement),
 
         GrammarRule(parse_ruleX, ExpressionStatement,  Semicolon),
-        GrammarRule(parse_ruleX, ExpressionStatement,  Expression, Semicolon),
+        GrammarRule(parse_Passthrough, ExpressionStatement,  Expression, Semicolon),
 
         GrammarRule(parse_ruleX, SelectionStatement,  IF, LParen, Expression, RParen, Statement),
         GrammarRule(parse_ruleX, SelectionStatement,  IF, LParen, Expression, RParen, Statement, ELSE, Statement),

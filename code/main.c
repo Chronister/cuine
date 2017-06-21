@@ -64,22 +64,25 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
         if (!Inline) printf("\n");
         return;
     }
-    switch(*(cst_node_type*)Node) {
+    switch(*(cst_node_type*)Node) 
+    {
         case CST_TranslationUnit:
+        {
             printf("translation unit:");
             if (!Inline) printf("\n");
             array_for(cst_node, Decl, ((cst_node_translation_unit*)Node)->ExternDecls) {
                 WalkTree(Decl, Tab + 1, false);
             }
             if (!Inline) printf("\n");
-            break;
+        } break;
             
         case CST_FunctionType:
+        {
             cst_node_function_type* Func = (cst_node_function_type*)Node;
             printf("function () ");
             if (!Inline) printf("\n");
             WalkTree(Func->Body, Tab, false);
-            break;
+        } break;
 
         case CST_Block:
             if (!Inline) printf("\n");
@@ -108,6 +111,12 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
                 if (Pointer & DECL_VOLATILE) printf("volatile ");
             }
             WalkTree(Decl->Name, Tab + 1, true);
+
+            if (Decl->Initializer != NULL) {
+                printf(" = ");
+                WalkTree(Decl->Initializer, Tab + 1, true);
+            }
+
             if (!Inline) printf("\n");
         } break;
 
@@ -127,6 +136,12 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
             printf("%.*s", Ident->TextLength, Ident->Text);
         } break;
 
+        case CST_StringConstant:
+        {
+            cst_node_string_constant* String = (cst_node_string_constant*)Node;
+            printf("\"%.*s\"", String->TextLength, String->Text);
+        } break;
+
         case CST_BuiltinType:
         {
             cst_node_builtin_type* TypeNode = (cst_node_builtin_type*)Node;
@@ -142,6 +157,19 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
             if (TypeNode->Type & TYPE_FLOAT) printf("float ");
             if (TypeNode->Type & TYPE_DOUBLE) printf("double ");
             if (TypeNode->Type & TYPE_COMPLEX) printf("_Complex ");
+        } break;
+
+        case CST_BinaryOperator:
+        {
+            cst_node_binary_operator* Op = (cst_node_binary_operator*)Node;
+            printf("(");
+            WalkTree(Op->Left, Tab + 1, true);
+            printf(" ");
+            printf(TokenType_Str(Op->Operation));
+            printf(" ");
+            WalkTree(Op->Right, Tab + 1, true);
+            printf(")");
+            if (!Inline) { printf("\n"); }
         } break;
 
         default:

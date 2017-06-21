@@ -194,6 +194,13 @@ get_token:
                 default:  Token.Type = Divide; return Token;
             }
             break;
+        case '%': 
+            ++Tzer->At;
+            switch (*Tzer->At) {
+                case '=': Token.Type = ModulusEquals; ++Tzer->At; return Token;
+                default:  Token.Type = Modulus; return Token;
+            }
+            break;
             
         case '!': 
             ++Tzer->At;
