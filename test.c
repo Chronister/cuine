@@ -15,7 +15,7 @@ int main(int argc, char* argv) {
     const double test2 = 4e-31;
     long double test3 = 9E99;
     double q = test1 + test3;
-    x % y;
+    y += x % y;
     int b = x ^ y & z * z | 37;
     if (x + y > 16) {
         int z = 7;

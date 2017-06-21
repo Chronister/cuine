@@ -57,7 +57,8 @@ void WalkTree(lst_node* Node, int Tab) {
 #endif
 
 void WalkTree(cst_node Node, int Tab, bool Inline) {
-    if (!Inline) for (int i = 0; i < Tab; ++i) printf("  ");
+    if (!Inline && (Node ? (*(cst_node_type*)Node != CST_Block && *(cst_node_type*)Node != CST_DeclarationList) : 1))
+        for (int i = 0; i < Tab; ++i) printf("  ");
 
     if (Node == NULL) {
         printf("null"); 
@@ -81,11 +82,10 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
             cst_node_function_type* Func = (cst_node_function_type*)Node;
             printf("function () ");
             if (!Inline) printf("\n");
-            WalkTree(Func->Body, Tab, false);
+            if (Func->Body) WalkTree(Func->Body, Tab, false);
         } break;
 
         case CST_Block:
-            if (!Inline) printf("\n");
             array_for(cst_node, Stmt, ((cst_node_block*)Node)->Statements) {
                 WalkTree(Stmt, Tab + 1, false);
             }
@@ -123,10 +123,10 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
         case CST_DeclarationList:
         {
             cst_node_declaration_list* List = (cst_node_declaration_list*)Node;
-            printf("declaration list:");
-            if (!Inline) printf("\n");
+            //printf("declaration list:");
+            //if (!Inline) printf("\n");
             array_for(cst_node, Decl, List->Declarations) {
-                WalkTree(Decl, Tab + 1, false);
+                WalkTree(Decl, Tab, false);
             }
         } break;
 
@@ -170,6 +170,59 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
             WalkTree(Op->Right, Tab + 1, true);
             printf(")");
             if (!Inline) { printf("\n"); }
+        } break;
+
+        case CST_Conditional:
+        {
+            cst_node_conditional* Cond = (cst_node_conditional*)Node;
+            printf("if (");
+            WalkTree(Cond->Condition, Tab + 1, true);
+            printf(")");
+            if (!Inline) printf("\n");
+            WalkTree(Cond->TrueBranch, Tab + 1, Inline);
+            if (Cond->FalseBranch != NULL) {
+                if (!Inline) for (int i = 0; i < Tab; ++i) printf("  ");
+                printf("else");
+                if (!Inline) printf("\n");
+                WalkTree(Cond->FalseBranch, Tab + 1, Inline);
+            }
+        } break;
+
+        case CST_Jump:
+        {
+            cst_node_jump* Jump = (cst_node_jump*)Node;
+            switch(Jump->Type) {
+                case CONTINUE: printf("continue");
+                case BREAK:    printf("break");
+                case RETURN:   printf("return");
+            }
+            if (Jump->Expression) {
+                printf(" ");
+                WalkTree(Jump->Expression, Tab + 1, true);
+            }
+            if (!Inline) printf("\n");
+        } break;
+
+        case CST_Assignment:
+        {
+            cst_node_assignment* Assignment = (cst_node_assignment*)Node;
+
+            WalkTree(Assignment->LValue, Tab + 1, true);
+            switch(Assignment->Operator) {
+                case Assign: printf(" = "); break;
+                case TimesEquals: printf(" *= "); break;
+                case DivideEquals: printf(" /= "); break;
+                case ModulusEquals: printf(" %= "); break;
+                case PlusEquals: printf(" += "); break;
+                case MinusEquals: printf(" -= "); break;
+                case LBitShiftEquals: printf(" <<= "); break;
+                case RBitShiftEquals: printf(" >>= "); break;
+                case BitAndEquals: printf(" &= "); break;
+                case BitXorEquals: printf(" ^= "); break;
+                case BitOrEquals: printf(" |= "); break;
+            }
+            WalkTree(Assignment->RValue, Tab + 1, true);
+            if (!Inline) printf("\n");
         } break;
 
         default:

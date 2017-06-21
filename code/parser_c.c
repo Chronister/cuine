@@ -355,6 +355,32 @@ PARSE_FUNC(parse_BinaryExpression, Context, Tokens, Parsed) {
     return PushNode(Context, Node);
 }
 
+PARSE_FUNC(parse_If, Context, Tokens, Parsed) {
+    cst_node_conditional Node = { CST_Conditional };
+    Node.Condition = array_at(Parsed, 2);
+    Node.TrueBranch = array_at(Parsed, 4);
+
+    if (Tokens.Length > 5) Node.FalseBranch = array_at(Parsed, 6);
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_JumpStmt, Context, Tokens, Parsed) {
+    cst_node_jump Node = { CST_Jump };
+    Node.Type = array_at(Tokens, 0).Type;
+    if (Tokens.Length == 3) Node.Expression = array_at(Parsed, 1);
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_AssignmentExpr, Context, Tokens, Parsed) {
+    cst_node_assignment Node = { CST_Assignment };
+
+    Node.Operator = (uintptr_t)array_at(Parsed, 1);
+    Node.LValue = array_at(Parsed, 0);
+    Node.RValue = array_at(Parsed, 2);
+
+    return PushNode(Context, Node);
+}
+
 PARSE_FUNC(parse_ruleX, Context, Tokens, Parsed) {
     //array_for(token, Token, Tokens) {
     //    printf("\tTokens[%d]: %s\n", TokenIndex, SymbolStr(Token.Type));
@@ -453,19 +479,19 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, ConditionalExpression,  LogicalORExpression, QuestionMark, Expression, Colon, ConditionalExpression),
 
         GrammarRule(parse_Passthrough, AssignmentExpression,  ConditionalExpression),
-        GrammarRule(parse_ruleX, AssignmentExpression,  UnaryExpression, AssignmentOperator, AssignmentExpression),
+        GrammarRule(parse_AssignmentExpr, AssignmentExpression,  UnaryExpression, AssignmentOperator, AssignmentExpression),
 
-        GrammarRule(parse_ruleX, AssignmentOperator,  Assign),
-        GrammarRule(parse_ruleX, AssignmentOperator,  TimesEquals),
-        GrammarRule(parse_ruleX, AssignmentOperator,  DivideEquals),
-        GrammarRule(parse_ruleX, AssignmentOperator,  ModulusEquals),
-        GrammarRule(parse_ruleX, AssignmentOperator,  PlusEquals),
-        GrammarRule(parse_ruleX, AssignmentOperator,  MinusEquals),
-        GrammarRule(parse_ruleX, AssignmentOperator,  LBitShiftEquals),
-        GrammarRule(parse_ruleX, AssignmentOperator,  RBitShiftEquals),
-        GrammarRule(parse_ruleX, AssignmentOperator,  BitAndEquals),
-        GrammarRule(parse_ruleX, AssignmentOperator,  BitXorEquals),
-        GrammarRule(parse_ruleX, AssignmentOperator,  BitOrEquals),
+        GrammarRule(parse_PassthroughTokenType, AssignmentOperator,  Assign),
+        GrammarRule(parse_PassthroughTokenType, AssignmentOperator,  TimesEquals),
+        GrammarRule(parse_PassthroughTokenType, AssignmentOperator,  DivideEquals),
+        GrammarRule(parse_PassthroughTokenType, AssignmentOperator,  ModulusEquals),
+        GrammarRule(parse_PassthroughTokenType, AssignmentOperator,  PlusEquals),
+        GrammarRule(parse_PassthroughTokenType, AssignmentOperator,  MinusEquals),
+        GrammarRule(parse_PassthroughTokenType, AssignmentOperator,  LBitShiftEquals),
+        GrammarRule(parse_PassthroughTokenType, AssignmentOperator,  RBitShiftEquals),
+        GrammarRule(parse_PassthroughTokenType, AssignmentOperator,  BitAndEquals),
+        GrammarRule(parse_PassthroughTokenType, AssignmentOperator,  BitXorEquals),
+        GrammarRule(parse_PassthroughTokenType, AssignmentOperator,  BitOrEquals),
 
         GrammarRule(parse_Passthrough, Expression,  AssignmentExpression),
         GrammarRule(parse_ruleX, Expression,  Expression, Comma, AssignmentExpression),
@@ -661,11 +687,11 @@ cf_grammar GenerateGrammar()
  
         /* § A.2.3 Statements */
         GrammarRule(parse_ruleX, Statement,  LabeledStatement),
-        GrammarRule(parse_ruleX, Statement,  CompoundStatement),
+        GrammarRule(parse_Passthrough, Statement,  CompoundStatement),
         GrammarRule(parse_Passthrough, Statement,  ExpressionStatement),
-        GrammarRule(parse_ruleX, Statement,  SelectionStatement),
+        GrammarRule(parse_Passthrough, Statement,  SelectionStatement),
         GrammarRule(parse_ruleX, Statement,  IterationStatement),
-        GrammarRule(parse_ruleX, Statement,  JumpStatement),
+        GrammarRule(parse_Passthrough, Statement,  JumpStatement),
          
         GrammarRule(parse_ruleX, LabeledStatement,  Identifier, Colon, Statement),
         GrammarRule(parse_ruleX, LabeledStatement,  CASE, ConstantExpression, Colon, Statement),
@@ -683,8 +709,8 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, ExpressionStatement,  Semicolon),
         GrammarRule(parse_Passthrough, ExpressionStatement,  Expression, Semicolon),
 
-        GrammarRule(parse_ruleX, SelectionStatement,  IF, LParen, Expression, RParen, Statement),
-        GrammarRule(parse_ruleX, SelectionStatement,  IF, LParen, Expression, RParen, Statement, ELSE, Statement),
+        GrammarRule(parse_If, SelectionStatement,  IF, LParen, Expression, RParen, Statement),
+        GrammarRule(parse_If, SelectionStatement,  IF, LParen, Expression, RParen, Statement, ELSE, Statement),
         GrammarRule(parse_ruleX, SelectionStatement,  SWITCH, LParen, Expression, RParen, Statement),
 
         GrammarRule(parse_ruleX, IterationStatement,  WHILE, LParen, Expression, RParen, Statement),
@@ -700,10 +726,10 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, IterationStatement,  FOR, Expression, Semicolon, Expression, Semicolon, Expression, RParen, Statement),
 
         GrammarRule(parse_ruleX, JumpStatement,  GOTO, Identifier, Semicolon),
-        GrammarRule(parse_ruleX, JumpStatement,  CONTINUE, Semicolon),
-        GrammarRule(parse_ruleX, JumpStatement,  BREAK, Semicolon),
-        GrammarRule(parse_ruleX, JumpStatement,  RETURN, Semicolon),
-        GrammarRule(parse_ruleX, JumpStatement,  RETURN, Expression, Semicolon),
+        GrammarRule(parse_JumpStmt, JumpStatement,  CONTINUE, Semicolon),
+        GrammarRule(parse_JumpStmt, JumpStatement,  BREAK, Semicolon),
+        GrammarRule(parse_JumpStmt, JumpStatement,  RETURN, Semicolon),
+        GrammarRule(parse_JumpStmt, JumpStatement,  RETURN, Expression, Semicolon),
 
         /* § A.2.4 External definitions */
         GrammarRule(parse_TranslationUnit, TranslationUnit,  ExternalDeclaration),

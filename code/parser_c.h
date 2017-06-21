@@ -26,6 +26,9 @@
     X(FloatingConstant),    \
     X(CharacterConstant),   \
     X(BinaryOperator),      \
+    X(Conditional),         \
+    X(Jump),                \
+    X(Assignment),          \
     X(TranslationUnit),
 
 #define CST_(x) CST_##x
@@ -192,6 +195,29 @@ typedef struct {
     cst_node Left;
     cst_node Right;
 } cst_node_binary_operator;
+
+typedef struct {
+    cst_node_header Header;
+
+    cf_symbol_t Operator;
+    cst_node LValue;
+    cst_node RValue;
+} cst_node_assignment;
+
+typedef struct {
+    cst_node_header Header;
+
+    cst_node Condition;
+    cst_node TrueBranch;
+    cst_node FalseBranch; // Can be NULL
+} cst_node_conditional;
+
+typedef struct {
+    cst_node_header Header;
+
+    cf_symbol_t Type;
+    cst_node Expression; // NULL unless Type is RETURN and an expression is being returned
+} cst_node_jump;
 
 typedef struct {
     void* Memory;
