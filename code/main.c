@@ -172,6 +172,17 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
             if (!Inline) { printf("\n"); }
         } break;
 
+        case CST_UnaryOperator:
+        {
+            cst_node_unary_operator* Op = (cst_node_unary_operator*)Node;
+            printf("(");
+            printf(TokenType_Str(Op->Operation));
+            printf(" ");
+            WalkTree(Op->Operand, Tab + 1, true);
+            printf(")");
+            if (!Inline) { printf("\n"); }
+        } break;
+
         case CST_Conditional:
         {
             cst_node_conditional* Cond = (cst_node_conditional*)Node;

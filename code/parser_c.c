@@ -355,6 +355,34 @@ PARSE_FUNC(parse_BinaryExpression, Context, Tokens, Parsed) {
     return PushNode(Context, Node);
 }
 
+PARSE_FUNC(parse_UnaryPrefixExpression, Context, Tokens, Parsed) {
+    cst_node_unary_operator Node = { CST_UnaryOperator };
+    Node.Operation = array_at(Tokens, 0).Type;
+    Node.Operand = array_at(Parsed, 1);
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_UnaryPrefixOperator, Context, Tokens, Parsed) {
+    cst_node_unary_operator Node = { CST_UnaryOperator };
+    Node.Operation = (uintptr_t)array_at(Parsed, 0);
+    Node.Operand = array_at(Parsed, 1);
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_Sizeof, Context, Tokens, Parsed) {
+    //TODO do we want to turn this into a compiler-intrinsic "constexpr" function?
+    cst_node_unary_operator Node = { CST_UnaryOperator };
+    if (Tokens.Length == 2) {
+        Node.Operation = array_at(Tokens, 0).Type;
+        Node.Operand = array_at(Parsed, 1);
+    } else if (Tokens.Length == 4) {
+        Node.Operation = array_at(Tokens, 0).Type;
+        Node.Operand = array_at(Parsed, 2);
+    }
+    else_invalid;
+    return PushNode(Context, Node);
+}
+
 PARSE_FUNC(parse_If, Context, Tokens, Parsed) {
     cst_node_conditional Node = { CST_Conditional };
     Node.Condition = array_at(Parsed, 2);
@@ -382,9 +410,9 @@ PARSE_FUNC(parse_AssignmentExpr, Context, Tokens, Parsed) {
 }
 
 PARSE_FUNC(parse_ruleX, Context, Tokens, Parsed) {
-    //array_for(token, Token, Tokens) {
-    //    printf("\tTokens[%d]: %s\n", TokenIndex, SymbolStr(Token.Type));
-    //}
+    array_for(token, Token, Tokens) {
+        printf("\tTokens[%d]: %s\n", TokenIndex, SymbolStr(Token.Type));
+    }
     return NULL;
 }
 
@@ -421,18 +449,19 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, ArgumentExpressionList,  ArgumentExpressionList, AssignmentExpression),
 
         GrammarRule(parse_Passthrough, UnaryExpression,  PostfixExpression),
-        GrammarRule(parse_ruleX, UnaryExpression,  Increment, UnaryExpression),
-        GrammarRule(parse_ruleX, UnaryExpression,  Decrement, UnaryExpression),
-        GrammarRule(parse_ruleX, UnaryExpression,  UnaryOperator, CastExpression),
-        GrammarRule(parse_ruleX, UnaryExpression,  SIZEOF, UnaryExpression),
-        GrammarRule(parse_ruleX, UnaryExpression,  SIZEOF, LParen, TypeName, RParen),
+        GrammarRule(parse_UnaryPrefixExpression, UnaryExpression,  Increment, UnaryExpression),
+        GrammarRule(parse_UnaryPrefixExpression, UnaryExpression,  Decrement, UnaryExpression),
+        GrammarRule(parse_UnaryPrefixOperator, UnaryExpression,  UnaryOperator, CastExpression),
+        GrammarRule(parse_Sizeof, UnaryExpression,  SIZEOF, UnaryExpression),
+        /* Change: surely this should be UnaryExpression, not TypeName? */
+        GrammarRule(parse_Sizeof, UnaryExpression,  SIZEOF, LParen, UnaryExpression, RParen),
         
-        GrammarRule(parse_ruleX, UnaryOperator,  Ampersand),
-        GrammarRule(parse_ruleX, UnaryOperator,  Asterisk),
-        GrammarRule(parse_ruleX, UnaryOperator,  Plus),
-        GrammarRule(parse_ruleX, UnaryOperator,  Minus),
-        GrammarRule(parse_ruleX, UnaryOperator,  BitNot),
-        GrammarRule(parse_ruleX, UnaryOperator,  LogicNot),
+        GrammarRule(parse_PassthroughTokenType, UnaryOperator,  Ampersand),
+        GrammarRule(parse_PassthroughTokenType, UnaryOperator,  Asterisk),
+        GrammarRule(parse_PassthroughTokenType, UnaryOperator,  Plus),
+        GrammarRule(parse_PassthroughTokenType, UnaryOperator,  Minus),
+        GrammarRule(parse_PassthroughTokenType, UnaryOperator,  BitNot),
+        GrammarRule(parse_PassthroughTokenType, UnaryOperator,  LogicNot),
 
         GrammarRule(parse_Passthrough, CastExpression,  UnaryExpression),
         GrammarRule(parse_ruleX, CastExpression,  LParen, TypeName, RParen, CastExpression),

@@ -26,6 +26,7 @@
     X(FloatingConstant),    \
     X(CharacterConstant),   \
     X(BinaryOperator),      \
+    X(UnaryOperator),      \
     X(Conditional),         \
     X(Jump),                \
     X(Assignment),          \
@@ -195,6 +196,13 @@ typedef struct {
     cst_node Left;
     cst_node Right;
 } cst_node_binary_operator;
+
+typedef struct {
+    cst_node_header Header;
+
+    cf_symbol_t Operation;
+    cst_node Operand;
+} cst_node_unary_operator;
 
 typedef struct {
     cst_node_header Header;
