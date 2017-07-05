@@ -359,6 +359,15 @@ PARSE_FUNC(parse_UnaryPrefixExpression, Context, Tokens, Parsed) {
     cst_node_unary_operator Node = { CST_UnaryOperator };
     Node.Operation = array_at(Tokens, 0).Type;
     Node.Operand = array_at(Parsed, 1);
+    Node.Affix = PREFIX;
+    return PushNode(Context, Node);
+}
+
+PARSE_FUNC(parse_UnaryPostfixExpression, Context, Tokens, Parsed) {
+    cst_node_unary_operator Node = { CST_UnaryOperator };
+    Node.Operation = array_at(Tokens, 1).Type;
+    Node.Operand = array_at(Parsed, 0);
+    Node.Affix = POSTFIX;
     return PushNode(Context, Node);
 }
 
@@ -440,8 +449,8 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ruleX, PostfixExpression,  PostfixExpression, LParen, ArgumentExpressionList, RParen),
         GrammarRule(parse_ruleX, PostfixExpression,  PostfixExpression, Dot, Identifier),
         GrammarRule(parse_ruleX, PostfixExpression,  PostfixExpression, Arrow, Identifier),
-        GrammarRule(parse_ruleX, PostfixExpression,  PostfixExpression, Increment),
-        GrammarRule(parse_ruleX, PostfixExpression,  PostfixExpression, Decrement),
+        GrammarRule(parse_UnaryPostfixExpression, PostfixExpression,  PostfixExpression, Increment),
+        GrammarRule(parse_UnaryPostfixExpression, PostfixExpression,  PostfixExpression, Decrement),
         GrammarRule(parse_ruleX, PostfixExpression,  LParen, TypeName, RParen, LCurly, InitializerList, RCurly),
         GrammarRule(parse_ruleX, PostfixExpression,  LParen, TypeName, RParen, LCurly, InitializerList, RCurly, Comma),
 

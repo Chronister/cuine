@@ -176,9 +176,15 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
         {
             cst_node_unary_operator* Op = (cst_node_unary_operator*)Node;
             printf("(");
-            printf(TokenType_Str(Op->Operation));
-            printf(" ");
+            if (Op->Affix == PREFIX) {
+                printf(TokenType_Str(Op->Operation));
+                printf(" ");
+            }
             WalkTree(Op->Operand, Tab + 1, true);
+            if (Op->Affix == POSTFIX) {
+                printf(" ");
+                printf(TokenType_Str(Op->Operation));
+            }
             printf(")");
             if (!Inline) { printf("\n"); }
         } break;

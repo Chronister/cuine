@@ -21,7 +21,7 @@ int main(int argc, char* argv) {
         int z = 7;
         x = z - y;
         ++x;
-        z = --y + sizeof test + ++test2 - -test3;
+        z = --y + sizeof test +++test2 --- --test3;
     } else x = 2;
     int* p = &y;
     int q = *p;

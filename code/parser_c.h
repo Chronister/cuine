@@ -197,11 +197,14 @@ typedef struct {
     cst_node Right;
 } cst_node_binary_operator;
 
+enum affix_t { PREFIX = 0, POSTFIX };
+
 typedef struct {
     cst_node_header Header;
 
     cf_symbol_t Operation;
     cst_node Operand;
+    enum affix_t Affix;
 } cst_node_unary_operator;
 
 typedef struct {
