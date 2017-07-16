@@ -47,14 +47,13 @@ PARSE_FUNC(parse_ExternDecl, Context, Tokens, Parsed) {
 
 PARSE_FUNC(parse_FunctionDefn, Context, Tokens, Parsed) {
     cst_node_function_type Node = { CST_FunctionType };
-    //TODO
+    Node.Arguments = array_new(cst_node, 0);
     cst_node_block* Block = NULL;
     if (Tokens.Length == 3) {
         Block = (cst_node_block*)array_at(Parsed, 2);
+        Node.Argument
     }
-    else if (Tokens.Length == 4) {
-        Block = (cst_node_block*)array_at(Parsed, 3);
-    }
+    //else if (Tokens.Length == 4) { }
     else_invalid;
 
     Node.Body = Block;
@@ -285,8 +284,12 @@ PARSE_FUNC(parse_ArrayDecl, Context, Tokens, Parsed) {
 }
 
 PARSE_FUNC(parse_FunctionDecl, Context, Tokens, Parsed) {
-    cst_node_array_type Node = { CST_FunctionType };
-    //TODO
+    cst_node_function_type Node = { CST_FunctionType };
+
+    if (CST_NODE_TYPE(array_at(Parsed, 0)) == CST_Identifier) {
+
+    }
+
     return PushNode(Context, Node);
 }
 
@@ -401,6 +404,15 @@ PARSE_FUNC(parse_If, Context, Tokens, Parsed) {
     return PushNode(Context, Node);
 }
 
+PARSE_FUNC(parse_TernaryExpression, Context, Tokens, Parsed) {
+    cst_node_conditional Node = { CST_Conditional };
+    Node.Condition = array_at(Parsed, 0);
+    Node.TrueBranch = array_at(Parsed, 2);
+    Node.FalseBranch = array_at(Parsed, 4);
+
+    return PushNode(Context, Node);
+}
+
 PARSE_FUNC(parse_JumpStmt, Context, Tokens, Parsed) {
     cst_node_jump Node = { CST_Jump };
     Node.Type = array_at(Tokens, 0).Type;
@@ -418,7 +430,7 @@ PARSE_FUNC(parse_AssignmentExpr, Context, Tokens, Parsed) {
     return PushNode(Context, Node);
 }
 
-PARSE_FUNC(parse_ruleX, Context, Tokens, Parsed) {
+PARSE_FUNC(parse_TODO, Context, Tokens, Parsed) {
     array_for(token, Token, Tokens) {
         printf("\tTokens[%d]: %s\n", TokenIndex, SymbolStr(Token.Type));
     }
@@ -444,18 +456,18 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_PassthroughSecond, PrimaryExpression,  LParen, Expression, RParen),
 
         GrammarRule(parse_Passthrough, PostfixExpression,  PrimaryExpression),
-        GrammarRule(parse_ruleX, PostfixExpression,  PostfixExpression, LBracket, Expression, RBracket),
-        GrammarRule(parse_ruleX, PostfixExpression,  PostfixExpression, LParen, RParen),
-        GrammarRule(parse_ruleX, PostfixExpression,  PostfixExpression, LParen, ArgumentExpressionList, RParen),
-        GrammarRule(parse_ruleX, PostfixExpression,  PostfixExpression, Dot, Identifier),
-        GrammarRule(parse_ruleX, PostfixExpression,  PostfixExpression, Arrow, Identifier),
+        GrammarRule(parse_TODO, PostfixExpression,  PostfixExpression, LBracket, Expression, RBracket),
+        GrammarRule(parse_TODO, PostfixExpression,  PostfixExpression, LParen, RParen),
+        GrammarRule(parse_TODO, PostfixExpression,  PostfixExpression, LParen, ArgumentExpressionList, RParen),
+        GrammarRule(parse_TODO, PostfixExpression,  PostfixExpression, Dot, Identifier),
+        GrammarRule(parse_TODO, PostfixExpression,  PostfixExpression, Arrow, Identifier),
         GrammarRule(parse_UnaryPostfixExpression, PostfixExpression,  PostfixExpression, Increment),
         GrammarRule(parse_UnaryPostfixExpression, PostfixExpression,  PostfixExpression, Decrement),
-        GrammarRule(parse_ruleX, PostfixExpression,  LParen, TypeName, RParen, LCurly, InitializerList, RCurly),
-        GrammarRule(parse_ruleX, PostfixExpression,  LParen, TypeName, RParen, LCurly, InitializerList, RCurly, Comma),
+        GrammarRule(parse_TODO, PostfixExpression,  LParen, TypeName, RParen, LCurly, InitializerList, RCurly),
+        GrammarRule(parse_TODO, PostfixExpression,  LParen, TypeName, RParen, LCurly, InitializerList, RCurly, Comma),
 
         GrammarRule(parse_Passthrough, ArgumentExpressionList,  AssignmentExpression),
-        GrammarRule(parse_ruleX, ArgumentExpressionList,  ArgumentExpressionList, AssignmentExpression),
+        GrammarRule(parse_TODO, ArgumentExpressionList,  ArgumentExpressionList, AssignmentExpression),
 
         GrammarRule(parse_Passthrough, UnaryExpression,  PostfixExpression),
         GrammarRule(parse_UnaryPrefixExpression, UnaryExpression,  Increment, UnaryExpression),
@@ -473,7 +485,7 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_PassthroughTokenType, UnaryOperator,  LogicNot),
 
         GrammarRule(parse_Passthrough, CastExpression,  UnaryExpression),
-        GrammarRule(parse_ruleX, CastExpression,  LParen, TypeName, RParen, CastExpression),
+        GrammarRule(parse_TODO, CastExpression,  LParen, TypeName, RParen, CastExpression),
 
         GrammarRule(parse_Passthrough, MultiplicativeExpression,  CastExpression),
         GrammarRule(parse_BinaryExpression, MultiplicativeExpression,  MultiplicativeExpression, Asterisk, CastExpression),
@@ -514,7 +526,7 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_BinaryExpression, LogicalORExpression,  LogicalORExpression, LogicOr, LogicalANDExpression),
 
         GrammarRule(parse_Passthrough, ConditionalExpression,  LogicalORExpression),
-        GrammarRule(parse_ruleX, ConditionalExpression,  LogicalORExpression, QuestionMark, Expression, Colon, ConditionalExpression),
+        GrammarRule(parse_TernaryExpression, ConditionalExpression,  LogicalORExpression, QuestionMark, Expression, Colon, ConditionalExpression),
 
         GrammarRule(parse_Passthrough, AssignmentExpression,  ConditionalExpression),
         GrammarRule(parse_AssignmentExpr, AssignmentExpression,  UnaryExpression, AssignmentOperator, AssignmentExpression),
@@ -532,7 +544,7 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_PassthroughTokenType, AssignmentOperator,  BitOrEquals),
 
         GrammarRule(parse_Passthrough, Expression,  AssignmentExpression),
-        GrammarRule(parse_ruleX, Expression,  Expression, Comma, AssignmentExpression),
+        GrammarRule(parse_TODO, Expression,  Expression, Comma, AssignmentExpression),
 
         GrammarRule(parse_Passthrough, ConstantExpression,  ConditionalExpression),
 
@@ -597,34 +609,34 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_PassthroughTokenType, StructOrUnion,  STRUCT),
         GrammarRule(parse_PassthroughTokenType, StructOrUnion,  UNION),
 
-        GrammarRule(parse_ruleX, StructDeclarationList,  StructDeclaration),
-        GrammarRule(parse_ruleX, StructDeclarationList,  StructDeclarationList, StructDeclaration),
+        GrammarRule(parse_TODO, StructDeclarationList,  StructDeclaration),
+        GrammarRule(parse_TODO, StructDeclarationList,  StructDeclarationList, StructDeclaration),
 
-        GrammarRule(parse_ruleX, StructDeclaration,  SpecifierQualifierList, StructDeclaratorList),
+        GrammarRule(parse_TODO, StructDeclaration,  SpecifierQualifierList, StructDeclaratorList),
 
-        GrammarRule(parse_ruleX, SpecifierQualifierList,  TypeSpecifier),
-        GrammarRule(parse_ruleX, SpecifierQualifierList,  TypeSpecifier, SpecifierQualifierList),
-        GrammarRule(parse_ruleX, SpecifierQualifierList,  TypeQualifier),
-        GrammarRule(parse_ruleX, SpecifierQualifierList,  TypeQualifier, SpecifierQualifierList),
+        GrammarRule(parse_TODO, SpecifierQualifierList,  TypeSpecifier),
+        GrammarRule(parse_TODO, SpecifierQualifierList,  TypeSpecifier, SpecifierQualifierList),
+        GrammarRule(parse_TODO, SpecifierQualifierList,  TypeQualifier),
+        GrammarRule(parse_TODO, SpecifierQualifierList,  TypeQualifier, SpecifierQualifierList),
 
-        GrammarRule(parse_ruleX, StructDeclaratorList,  StructDeclarator),
-        GrammarRule(parse_ruleX, StructDeclaratorList,  StructDeclaratorList, Comma, StructDeclarator),
+        GrammarRule(parse_TODO, StructDeclaratorList,  StructDeclarator),
+        GrammarRule(parse_TODO, StructDeclaratorList,  StructDeclaratorList, Comma, StructDeclarator),
 
-        GrammarRule(parse_ruleX, StructDeclarator,  Declarator),
-        GrammarRule(parse_ruleX, StructDeclarator,  Colon, ConstantExpression),
-        GrammarRule(parse_ruleX, StructDeclarator,  Declarator, Colon, ConstantExpression),
+        GrammarRule(parse_TODO, StructDeclarator,  Declarator),
+        GrammarRule(parse_TODO, StructDeclarator,  Colon, ConstantExpression),
+        GrammarRule(parse_TODO, StructDeclarator,  Declarator, Colon, ConstantExpression),
 
-        GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, LCurly, EnumeratorList, RCurly),
-        GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, Identifier, LCurly, EnumeratorList, RCurly),
-        GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, LCurly, EnumeratorList, Comma, RCurly),
-        GrammarRule(parse_ruleX, EnumSpecifier,  ENUM, Identifier, LCurly, EnumeratorList, Comma, RCurly),
+        GrammarRule(parse_TODO, EnumSpecifier,  ENUM, LCurly, EnumeratorList, RCurly),
+        GrammarRule(parse_TODO, EnumSpecifier,  ENUM, Identifier, LCurly, EnumeratorList, RCurly),
+        GrammarRule(parse_TODO, EnumSpecifier,  ENUM, LCurly, EnumeratorList, Comma, RCurly),
+        GrammarRule(parse_TODO, EnumSpecifier,  ENUM, Identifier, LCurly, EnumeratorList, Comma, RCurly),
         GrammarRule(parse_Identifier, EnumSpecifier,  ENUM, Identifier),
 
-        GrammarRule(parse_ruleX, EnumeratorList,  Enumerator),
-        GrammarRule(parse_ruleX, EnumeratorList,  EnumeratorList, Comma, Enumerator),
+        GrammarRule(parse_TODO, EnumeratorList,  Enumerator),
+        GrammarRule(parse_TODO, EnumeratorList,  EnumeratorList, Comma, Enumerator),
 
-        GrammarRule(parse_ruleX, Enumerator,  EnumerationConstant),
-        GrammarRule(parse_ruleX, Enumerator,  EnumerationConstant, Equals, ConstantExpression),
+        GrammarRule(parse_TODO, Enumerator,  EnumerationConstant),
+        GrammarRule(parse_TODO, Enumerator,  EnumerationConstant, Equals, ConstantExpression),
 
         GrammarRule(parse_CONST, TypeQualifier,  CONST),
         GrammarRule(parse_RESTRICT, TypeQualifier,  RESTRICT),
@@ -636,7 +648,7 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_Declarator, Declarator,  Pointer, DirectDeclarator),
 
         GrammarRule(parse_Identifier, DirectDeclarator,  Identifier),
-        GrammarRule(parse_ruleX, DirectDeclarator,  LParen, Declarator, RParen),
+        GrammarRule(parse_TODO, DirectDeclarator,  LParen, Declarator, RParen),
         GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, RBracket),
         GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, AssignmentExpression, RBracket),
         GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, RBracket),
@@ -657,83 +669,83 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_TypeQualifierList, TypeQualifierList,  TypeQualifier),
         GrammarRule(parse_TypeQualifierList, TypeQualifierList,  TypeQualifierList, TypeQualifier),
 
-        GrammarRule(parse_ruleX, ParameterTypeList,  ParameterList),
-        GrammarRule(parse_ruleX, ParameterTypeList,  ParameterList, Comma, Ellipses),
+        GrammarRule(parse_TODO, ParameterTypeList,  ParameterList),
+        GrammarRule(parse_TODO, ParameterTypeList,  ParameterList, Comma, Ellipses),
 
-        GrammarRule(parse_ruleX, ParameterList,  ParameterDeclaration),
-        GrammarRule(parse_ruleX, ParameterList,  ParameterList, Comma, ParameterDeclaration),
+        GrammarRule(parse_TODO, ParameterList,  ParameterDeclaration),
+        GrammarRule(parse_TODO, ParameterList,  ParameterList, Comma, ParameterDeclaration),
 
-        GrammarRule(parse_ruleX, ParameterDeclaration,  DeclarationSpecifiers, Declarator),
-        GrammarRule(parse_ruleX, ParameterDeclaration,  DeclarationSpecifiers),
-        GrammarRule(parse_ruleX, ParameterDeclaration,  DeclarationSpecifiers, AbstractDeclarator),
+        GrammarRule(parse_TODO, ParameterDeclaration,  DeclarationSpecifiers, Declarator),
+        GrammarRule(parse_TODO, ParameterDeclaration,  DeclarationSpecifiers),
+        GrammarRule(parse_TODO, ParameterDeclaration,  DeclarationSpecifiers, AbstractDeclarator),
 
-        GrammarRule(parse_ruleX, IdentifierList,  Identifier),
-        GrammarRule(parse_ruleX, IdentifierList,  IdentifierList, Comma, Identifier),
+        GrammarRule(parse_TODO, IdentifierList,  Identifier),
+        GrammarRule(parse_TODO, IdentifierList,  IdentifierList, Comma, Identifier),
 
-        GrammarRule(parse_ruleX, TypeName,  SpecifierQualifierList),
-        GrammarRule(parse_ruleX, TypeName,  SpecifierQualifierList, AbstractDeclarator),
+        GrammarRule(parse_TODO, TypeName,  SpecifierQualifierList),
+        GrammarRule(parse_TODO, TypeName,  SpecifierQualifierList, AbstractDeclarator),
 
-        GrammarRule(parse_ruleX, AbstractDeclarator,  Pointer),
-        GrammarRule(parse_ruleX, AbstractDeclarator,  DirectAbstractDeclarator),
-        GrammarRule(parse_ruleX, AbstractDeclarator,  Pointer, DirectAbstractDeclarator),
+        GrammarRule(parse_TODO, AbstractDeclarator,  Pointer),
+        GrammarRule(parse_TODO, AbstractDeclarator,  DirectAbstractDeclarator),
+        GrammarRule(parse_TODO, AbstractDeclarator,  Pointer, DirectAbstractDeclarator),
 
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  LParen, AbstractDeclarator, RParen),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  LParen, AbstractDeclarator, RParen),
 
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  LBracket, RBracket),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, RBracket),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  LBracket, TypeQualifierList, RBracket),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  LBracket, AssignmentExpression, RBracket),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, TypeQualifierList, RBracket),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, AssignmentExpression, RBracket),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  LBracket, TypeQualifierList, AssignmentExpression, RBracket),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, TypeQualifierList, AssignmentExpression, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  LBracket, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  LBracket, TypeQualifierList, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  LBracket, AssignmentExpression, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, TypeQualifierList, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, AssignmentExpression, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  LBracket, TypeQualifierList, AssignmentExpression, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, TypeQualifierList, AssignmentExpression, RBracket),
 
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  LBracket, STATIC, AssignmentExpression, RBracket),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, STATIC, AssignmentExpression, RBracket),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  LBracket, STATIC, TypeQualifierList, AssignmentExpression, RBracket),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, STATIC, TypeQualifierList, AssignmentExpression, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  LBracket, STATIC, AssignmentExpression, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, STATIC, AssignmentExpression, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  LBracket, STATIC, TypeQualifierList, AssignmentExpression, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, STATIC, TypeQualifierList, AssignmentExpression, RBracket),
 
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  LBracket, TypeQualifierList, STATIC, AssignmentExpression, RBracket),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, TypeQualifierList, STATIC, AssignmentExpression, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  LBracket, TypeQualifierList, STATIC, AssignmentExpression, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, TypeQualifierList, STATIC, AssignmentExpression, RBracket),
 
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  LBracket, Asterisk, RBracket),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, Asterisk, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  LBracket, Asterisk, RBracket),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  DirectAbstractDeclarator, LBracket, Asterisk, RBracket),
 
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  LParen, RParen),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  DirectAbstractDeclarator, LParen, RParen),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  LParen, ParameterTypeList, RParen),
-        GrammarRule(parse_ruleX, DirectAbstractDeclarator,  DirectAbstractDeclarator, LParen, ParameterTypeList, RParen),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  LParen, RParen),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  DirectAbstractDeclarator, LParen, RParen),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  LParen, ParameterTypeList, RParen),
+        GrammarRule(parse_TODO, DirectAbstractDeclarator,  DirectAbstractDeclarator, LParen, ParameterTypeList, RParen),
 
-        // x GrammarRule(parse_ruleX, TypedefName,  Identifier),
+        // x GrammarRule(parse_TODO, TypedefName,  Identifier),
 
         GrammarRule(parse_Passthrough, Initializer,  AssignmentExpression),
-        GrammarRule(parse_ruleX, Initializer,  LCurly, InitializerList, RCurly),
-        GrammarRule(parse_ruleX, Initializer,  LCurly, InitializerList, Comma, RCurly),
+        GrammarRule(parse_TODO, Initializer,  LCurly, InitializerList, RCurly),
+        GrammarRule(parse_TODO, Initializer,  LCurly, InitializerList, Comma, RCurly),
 
-        GrammarRule(parse_ruleX, InitializerList,  Initializer),
-        GrammarRule(parse_ruleX, InitializerList,  Designation, Initializer),
-        GrammarRule(parse_ruleX, InitializerList,  InitializerList, Comma, Initializer),
-        GrammarRule(parse_ruleX, InitializerList,  InitializerList, Comma, Designation, Initializer),
+        GrammarRule(parse_TODO, InitializerList,  Initializer),
+        GrammarRule(parse_TODO, InitializerList,  Designation, Initializer),
+        GrammarRule(parse_TODO, InitializerList,  InitializerList, Comma, Initializer),
+        GrammarRule(parse_TODO, InitializerList,  InitializerList, Comma, Designation, Initializer),
 
-        GrammarRule(parse_ruleX, Designation,  DesignatorList, Equals),
+        GrammarRule(parse_TODO, Designation,  DesignatorList, Equals),
 
-        GrammarRule(parse_ruleX, DesignatorList,  Designator),
-        GrammarRule(parse_ruleX, DesignatorList,  DesignatorList, Designator),
+        GrammarRule(parse_TODO, DesignatorList,  Designator),
+        GrammarRule(parse_TODO, DesignatorList,  DesignatorList, Designator),
 
-        GrammarRule(parse_ruleX, Designator,  LBracket, ConstantExpression, RBracket),
-        GrammarRule(parse_ruleX, Designator,  Dot, Identifier),
+        GrammarRule(parse_TODO, Designator,  LBracket, ConstantExpression, RBracket),
+        GrammarRule(parse_TODO, Designator,  Dot, Identifier),
  
         /* § A.2.3 Statements */
-        GrammarRule(parse_ruleX, Statement,  LabeledStatement),
+        GrammarRule(parse_TODO, Statement,  LabeledStatement),
         GrammarRule(parse_Passthrough, Statement,  CompoundStatement),
         GrammarRule(parse_Passthrough, Statement,  ExpressionStatement),
         GrammarRule(parse_Passthrough, Statement,  SelectionStatement),
-        GrammarRule(parse_ruleX, Statement,  IterationStatement),
+        GrammarRule(parse_TODO, Statement,  IterationStatement),
         GrammarRule(parse_Passthrough, Statement,  JumpStatement),
          
-        GrammarRule(parse_ruleX, LabeledStatement,  Identifier, Colon, Statement),
-        GrammarRule(parse_ruleX, LabeledStatement,  CASE, ConstantExpression, Colon, Statement),
-        GrammarRule(parse_ruleX, LabeledStatement,  DEFAULT, Colon, Statement),
+        GrammarRule(parse_TODO, LabeledStatement,  Identifier, Colon, Statement),
+        GrammarRule(parse_TODO, LabeledStatement,  CASE, ConstantExpression, Colon, Statement),
+        GrammarRule(parse_TODO, LabeledStatement,  DEFAULT, Colon, Statement),
 
         GrammarRule(parse_CompoundStmt, CompoundStatement,  LCurly, RCurly),
         GrammarRule(parse_CompoundStmt, CompoundStatement,  LCurly, BlockItemList, RCurly),
@@ -744,26 +756,26 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_Passthrough, BlockItem,  Declaration),
         GrammarRule(parse_Passthrough, BlockItem,  Statement),
 
-        GrammarRule(parse_ruleX, ExpressionStatement,  Semicolon),
+        GrammarRule(parse_TODO, ExpressionStatement,  Semicolon),
         GrammarRule(parse_Passthrough, ExpressionStatement,  Expression, Semicolon),
 
         GrammarRule(parse_If, SelectionStatement,  IF, LParen, Expression, RParen, Statement),
         GrammarRule(parse_If, SelectionStatement,  IF, LParen, Expression, RParen, Statement, ELSE, Statement),
-        GrammarRule(parse_ruleX, SelectionStatement,  SWITCH, LParen, Expression, RParen, Statement),
+        GrammarRule(parse_TODO, SelectionStatement,  SWITCH, LParen, Expression, RParen, Statement),
 
-        GrammarRule(parse_ruleX, IterationStatement,  WHILE, LParen, Expression, RParen, Statement),
-        GrammarRule(parse_ruleX, IterationStatement,  DO, Statement, WHILE, LParen, Expression, RParen, Semicolon),
+        GrammarRule(parse_TODO, IterationStatement,  WHILE, LParen, Expression, RParen, Statement),
+        GrammarRule(parse_TODO, IterationStatement,  DO, Statement, WHILE, LParen, Expression, RParen, Semicolon),
 
-        GrammarRule(parse_ruleX, IterationStatement,  FOR, Semicolon, Semicolon, RParen, Statement),
-        GrammarRule(parse_ruleX, IterationStatement,  FOR, Expression, Semicolon, Semicolon, RParen, Statement),
-        GrammarRule(parse_ruleX, IterationStatement,  FOR, Semicolon, Expression, Semicolon, RParen, Statement),
-        GrammarRule(parse_ruleX, IterationStatement,  FOR, Expression, Semicolon, Expression, Semicolon, RParen, Statement),
-        GrammarRule(parse_ruleX, IterationStatement,  FOR, Semicolon, Semicolon, Expression, RParen, Statement),
-        GrammarRule(parse_ruleX, IterationStatement,  FOR, Expression, Semicolon, Semicolon, Expression, RParen, Statement),
-        GrammarRule(parse_ruleX, IterationStatement,  FOR, Semicolon, Expression, Semicolon, Expression, RParen, Statement),
-        GrammarRule(parse_ruleX, IterationStatement,  FOR, Expression, Semicolon, Expression, Semicolon, Expression, RParen, Statement),
+        GrammarRule(parse_TODO, IterationStatement,  FOR, Semicolon, Semicolon, RParen, Statement),
+        GrammarRule(parse_TODO, IterationStatement,  FOR, Expression, Semicolon, Semicolon, RParen, Statement),
+        GrammarRule(parse_TODO, IterationStatement,  FOR, Semicolon, Expression, Semicolon, RParen, Statement),
+        GrammarRule(parse_TODO, IterationStatement,  FOR, Expression, Semicolon, Expression, Semicolon, RParen, Statement),
+        GrammarRule(parse_TODO, IterationStatement,  FOR, Semicolon, Semicolon, Expression, RParen, Statement),
+        GrammarRule(parse_TODO, IterationStatement,  FOR, Expression, Semicolon, Semicolon, Expression, RParen, Statement),
+        GrammarRule(parse_TODO, IterationStatement,  FOR, Semicolon, Expression, Semicolon, Expression, RParen, Statement),
+        GrammarRule(parse_TODO, IterationStatement,  FOR, Expression, Semicolon, Expression, Semicolon, Expression, RParen, Statement),
 
-        GrammarRule(parse_ruleX, JumpStatement,  GOTO, Identifier, Semicolon),
+        GrammarRule(parse_TODO, JumpStatement,  GOTO, Identifier, Semicolon),
         GrammarRule(parse_JumpStmt, JumpStatement,  CONTINUE, Semicolon),
         GrammarRule(parse_JumpStmt, JumpStatement,  BREAK, Semicolon),
         GrammarRule(parse_JumpStmt, JumpStatement,  RETURN, Semicolon),
@@ -777,7 +789,9 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ExternDecl, ExternalDeclaration,  Declaration),
 
         GrammarRule(parse_FunctionDefn, FunctionDefinition,  DeclarationSpecifiers, Declarator, CompoundStatement),
-        GrammarRule(parse_FunctionDefn, FunctionDefinition,  DeclarationSpecifiers, Declarator, DeclarationList, CompoundStatement),
+        // NOTE(chronister, jul 7 17): omitting the old-style definitions as
+        // they are very rare in modern code
+        //GrammarRule(parse_FunctionDefn, FunctionDefinition,  DeclarationSpecifiers, Declarator, DeclarationList, CompoundStatement),
 
         GrammarRule(parse_DeclList, DeclarationList,  Declaration),
         GrammarRule(parse_DeclList, DeclarationList,  DeclarationList, Declaration),

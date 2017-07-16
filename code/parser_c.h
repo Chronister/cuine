@@ -52,6 +52,8 @@ typedef struct {
     int SourceLine;
 } cst_node_header;
 
+#define CST_NODE_TYPE(node) (*(cst_node_type*)(node))
+
 typedef struct {
     cst_node_header Header;
     const char* Text;
@@ -107,8 +109,13 @@ typedef struct {
 typedef struct {
     cst_node_header Header;
 
-    // TODO
-    cst_node_block* Body; // NULL if this is a declaration
+    cst_node ReturnType;        // Any valid type node
+    cst_node_identifier* Name;  // Name of the function type. 
+                                //  NULL if this is part of another declaration,
+                                //  for example if the outer declaration is a function 
+                                //  that returns a (non-typedef'd) function pointer
+    array(cst_node) Arguments;  // CST_Declaration
+    cst_node_block* Body;       // NULL if this is a declaration
 } cst_node_function_type;
 
 typedef enum {
@@ -152,8 +159,8 @@ typedef struct {
                                                 //   CST_Identifier node for a named type
                                                 //   CST_StructuredType node for a structured type
                                                 //   CST_EnumSpecifier node for an enum type
-                                                //   CST_ArrayType node for an enum type
-                                                //   CST_FunctionType node for an enum type
+                                                //   CST_ArrayType node for an array type
+                                                //   CST_FunctionType node for an function type
 
     cst_node_identifier* Name;                  // null if the variable name is not yet known
     cst_node Initializer;                       // null if uninitialized
@@ -222,6 +229,13 @@ typedef struct {
     cst_node TrueBranch;
     cst_node FalseBranch; // Can be NULL
 } cst_node_conditional;
+
+typedef struct {
+    cst_node_header Header;
+
+    cf_symbol_t Type;
+    cst_node Expression; // NULL unless Type is RETURN and an expression is being returned
+} cst_node_jump;
 
 typedef struct {
     cst_node_header Header;
