@@ -72,7 +72,7 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
             printf("translation unit:");
             if (!Inline) printf("\n");
             array_for(cst_node, Decl, ((cst_node_translation_unit*)Node)->ExternDecls) {
-                WalkTree(Decl, Tab + 1, false);
+                WalkTree(Decl, Tab + 1, Inline);
             }
             if (!Inline) printf("\n");
         } break;
@@ -80,15 +80,22 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
         case CST_FunctionType:
         {
             cst_node_function_type* Func = (cst_node_function_type*)Node;
-            printf("function () ");
+            printf("function");
+            printf(" (");
+            array_for(cst_node, Argument, Func->Arguments) {
+                WalkTree(Argument, Tab + 1, true);
+                if (ArgumentIndex < Func->Arguments.Length - 1) printf(", ");
+            }
+            printf(") -> ");
+            WalkTree(Func->ReturnType, Tab + 1, true);
             if (!Inline) printf("\n");
-            if (Func->Body) WalkTree(Func->Body, Tab, false);
+            if (Func->Body) WalkTree(Func->Body, Tab, Inline);
         } break;
 
         case CST_Block:
-            array_for(cst_node, Stmt, ((cst_node_block*)Node)->Statements) {
-                WalkTree(Stmt, Tab + 1, false);
-            }
+            //array_for(cst_node, Stmt, ((cst_node_block*)Node)->Statements) {
+            //    WalkTree(Stmt, Tab + 1, false);
+            //}
             break;
 
         case CST_Declaration:
@@ -229,7 +236,7 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
                 case Assign: printf(" = "); break;
                 case TimesEquals: printf(" *= "); break;
                 case DivideEquals: printf(" /= "); break;
-                case ModulusEquals: printf(" %= "); break;
+                case ModulusEquals: printf(" %%= "); break;
                 case PlusEquals: printf(" += "); break;
                 case MinusEquals: printf(" -= "); break;
                 case LBitShiftEquals: printf(" <<= "); break;

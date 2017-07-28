@@ -19,6 +19,7 @@
     X(FunctionType),        \
     X(Declaration),         \
     X(DeclarationList),     \
+    X(VariadicArgument),    \
     X(Block),               \
     X(Statement),           \
     X(StringConstant),      \
@@ -26,11 +27,11 @@
     X(FloatingConstant),    \
     X(CharacterConstant),   \
     X(BinaryOperator),      \
-    X(UnaryOperator),      \
+    X(UnaryOperator),       \
     X(Conditional),         \
     X(Jump),                \
     X(Assignment),          \
-    X(TranslationUnit),
+    X(TranslationUnit),     \
 
 #define CST_(x) CST_##x
 
@@ -229,13 +230,6 @@ typedef struct {
     cst_node TrueBranch;
     cst_node FalseBranch; // Can be NULL
 } cst_node_conditional;
-
-typedef struct {
-    cst_node_header Header;
-
-    cf_symbol_t Type;
-    cst_node Expression; // NULL unless Type is RETURN and an expression is being returned
-} cst_node_jump;
 
 typedef struct {
     cst_node_header Header;

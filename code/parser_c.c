@@ -46,24 +46,41 @@ PARSE_FUNC(parse_ExternDecl, Context, Tokens, Parsed) {
 }
 
 PARSE_FUNC(parse_FunctionDefn, Context, Tokens, Parsed) {
-    cst_node_function_type Node = { CST_FunctionType };
-    Node.Arguments = array_new(cst_node, 0);
-    cst_node_block* Block = NULL;
+    cst_node_declaration* Base = cast(cst_node_declaration*, array_at(Parsed, 1));
+    assert(CST_NODE_TYPE(Base->BaseType) == CST_FunctionType);
+
+    cst_node_function_type* Func = cast(cst_node_function_type*, Base->BaseType);
+    cst_node_declaration* DeclSpecifiers = array_at(Parsed, 0); 
+
+    Base->SpecifierFlags = DeclSpecifiers->SpecifierFlags;
+
     if (Tokens.Length == 3) {
-        Block = (cst_node_block*)array_at(Parsed, 2);
-        Node.Argument
+        Func->Body = cast(cst_node_block*, array_at(Parsed, 2));
+        Func->ReturnType = DeclSpecifiers->BaseType;
     }
     //else if (Tokens.Length == 4) { }
     else_invalid;
 
-    Node.Body = Block;
-    return PushNode(Context, Node);
+    return Base;
 }
 
 PARSE_FUNC(parse_DeclList, Context, Tokens, Parsed) {
-    cst_node_declaration_list Node = { CST_DeclarationList };
-    //TODO
-    return PushNode(Context, Node);
+    if (Tokens.Length == 1) {
+        cst_node_declaration_list Node = { CST_DeclarationList };
+        Node.Declarations = array_init(cst_node, 1, array_at(Parsed, 0));
+        return PushNode(Context, Node);
+    }
+    else if (Tokens.Length == 2) {
+        cst_node_declaration_list* Node = cast(cst_node_declaration_list*, array_at(Parsed, 0)); 
+        array_push(cst_node, &Node->Declarations, array_at(Parsed, 1));
+        return Node;
+    }
+    else if (Tokens.Length == 3) {
+        cst_node_declaration_list* Node = cast(cst_node_declaration_list*, array_at(Parsed, 0)); 
+        array_push(cst_node, &Node->Declarations, array_at(Parsed, 2));
+        return Node;
+    }
+    else_invalid;
 }
 
 PARSE_FUNC(parse_InitDeclarator, Context, Tokens, Parsed) {
@@ -98,7 +115,24 @@ PARSE_FUNC(parse_Declaration, Context, Tokens, Parsed) {
         array_for(cst_node, Node, List->Declarations) {
             cst_node_declaration* Decl = (cst_node_declaration*)Node;
             Decl->SpecifierFlags = DeclSpecifiers->SpecifierFlags;
-            Decl->BaseType = DeclSpecifiers->BaseType;
+
+            if (Decl->BaseType == NULL) {
+                Decl->BaseType = DeclSpecifiers->BaseType;
+            }
+            else if (CST_NODE_TYPE(Decl->BaseType) == CST_FunctionType) {
+                cst_node_function_type* HigherFunc = cast(cst_node_function_type*, Decl->BaseType);
+                while (HigherFunc->ReturnType != NULL && 
+                       CST_NODE_TYPE(HigherFunc->ReturnType) == CST_FunctionType) 
+                {
+                    HigherFunc = HigherFunc->ReturnType;
+                }
+                assert(HigherFunc->ReturnType == NULL);
+                HigherFunc->ReturnType = DeclSpecifiers->BaseType;
+            }
+            else if (CST_NODE_TYPE(Decl->BaseType) == CST_ArrayType) {
+                assert(!"TODO");
+            }
+            else_invalid;
         }
         // free(DeclSpecifiers);
         return List;
@@ -211,14 +245,20 @@ PARSE_FUNC(parse_Declarator, Context, Tokens, Parsed) {
         Direct = array_at(Parsed, 0);
     }
 
-    switch (*(cst_node_type*)Direct) {
+    switch (CST_NODE_TYPE(Direct)) {
         case CST_Identifier:
-            Result->Name = (cst_node_identifier*)Direct;
+            Result->Name = cast(cst_node_identifier*, Direct);
+            Result->BaseType = NULL;
             break;
         case CST_FunctionType:
+        {
+            cst_node_function_type* Func = cast(cst_node_function_type*, Direct);
+            Result->BaseType = Func;
+            Result->Name = Func->Name;
+        } break;
         case CST_ArrayType:
-            //TODO
-            return Direct;
+            assert(!"TODO");
+            break;
         default:
             assert(!"TODO");
             break;
@@ -272,7 +312,7 @@ PARSE_FUNC(parse_MultiTypeList, Context, Tokens, Parsed) {
 PARSE_FUNC(parse_StructuredType, Context, Tokens, Parsed) 
 {
     cst_node_structured_type Node = { CST_StructuredType };
-    Node.IsUnion = ((uintptr_t)array_at(Parsed, 0) == UNION);
+    Node.IsUnion = (cast(uintptr_t, array_at(Parsed, 0)) == UNION);
     //TODO
     return PushNode(Context, Node);
 }
@@ -285,12 +325,64 @@ PARSE_FUNC(parse_ArrayDecl, Context, Tokens, Parsed) {
 
 PARSE_FUNC(parse_FunctionDecl, Context, Tokens, Parsed) {
     cst_node_function_type Node = { CST_FunctionType };
+    if (array_at(Tokens, 2).Type == ParameterTypeList) {
+        cst_node_declaration_list* List = cast(cst_node_declaration_list*, array_at(Parsed, 2));
 
-    if (CST_NODE_TYPE(array_at(Parsed, 0)) == CST_Identifier) {
-
+        Node.Arguments = List->Declarations;
+        //free(array_at(Parsed, 1));
     }
 
-    return PushNode(Context, Node);
+    switch (CST_NODE_TYPE(array_at(Parsed, 0))) {
+        case CST_Identifier: 
+            // Base case. This is a direct function declaration.
+            Node.Name = array_at(Parsed, 0);
+
+            return PushNode(Context, Node);
+        
+        case CST_FunctionType:
+        {
+            // Recursive case. The innermost-so-far DirectDeclarator returns a
+            // function pointer matching the type of this declarator (this
+            // declarator could be incomplete -- no return type -- so we will
+            // need to bubble that through later once we've seen the whole thing
+            // in FunctionDefinition
+
+            cst_node_identifier Name = { CST_Identifier };
+            Name.Text = "Anonymous function";
+            Name.TextLength = strlen("Anonymous function");
+            Node.Name = cast(cst_node_identifier*, PushNode(Context, Name));
+
+            cst_node_function_type* HigherFunc = cast(cst_node_function_type*, array_at(Parsed, 0));
+            while (HigherFunc->ReturnType != NULL && 
+                   CST_NODE_TYPE(HigherFunc->ReturnType) == CST_FunctionType) 
+            {
+                HigherFunc = HigherFunc->ReturnType;
+            }
+            assert(HigherFunc->ReturnType == NULL);
+            HigherFunc->ReturnType = PushNode(Context, Node);
+
+            return array_at(Parsed, 0);
+        } 
+
+        default_invalid;
+    }
+    return NULL;
+}
+
+PARSE_FUNC(parse_ParamDecl, Context, Tokens, Parsed) {
+    cst_node_declaration* Decl = cast(cst_node_declaration*, array_at(Parsed, 1));
+    cst_node_declaration* DeclSpecifiers = cast(cst_node_declaration*, array_at(Parsed, 0));
+    // Combine the decl specifiers with the base decl
+    Decl->SpecifierFlags = DeclSpecifiers->SpecifierFlags;
+    Decl->BaseType = DeclSpecifiers->BaseType;
+    // free(DeclSpecifiers);
+    return Decl;
+}
+
+PARSE_FUNC(parse_VarArgParams, Context, Tokens, Parsed) {
+    cst_node_declaration_list* List = cast(cst_node_declaration_list*, array_at(Parsed, 0));
+    array_push(cst_node, &List->Declarations, cast(cst_node, CST_VariadicArgument));
+    return List;
 }
 
 PARSE_FUNC(parse_CompoundStmt, Context, Tokens, Parsed) {
@@ -648,7 +740,7 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_Declarator, Declarator,  Pointer, DirectDeclarator),
 
         GrammarRule(parse_Identifier, DirectDeclarator,  Identifier),
-        GrammarRule(parse_TODO, DirectDeclarator,  LParen, Declarator, RParen),
+        GrammarRule(parse_PassthroughSecond, DirectDeclarator,  LParen, Declarator, RParen),
         GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, RBracket),
         GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, AssignmentExpression, RBracket),
         GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, RBracket),
@@ -656,10 +748,15 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, STATIC, AssignmentExpression, RBracket),
         GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, STATIC, TypeQualifierList, AssignmentExpression, RBracket),
         GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, STATIC, AssignmentExpression, RBracket),
+        GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, Asterisk, RBracket),
         GrammarRule(parse_ArrayDecl, DirectDeclarator,  DirectDeclarator, LBracket, TypeQualifierList, Asterisk, RBracket),
-        GrammarRule(parse_FunctionDecl, DirectDeclarator,  DirectDeclarator, LParen, ParameterTypeList, RParen),
         GrammarRule(parse_FunctionDecl, DirectDeclarator,  DirectDeclarator, LParen, RParen),
-        GrammarRule(parse_FunctionDecl, DirectDeclarator,  DirectDeclarator, LParen, IdentifierList, RParen),
+        GrammarRule(parse_FunctionDecl, DirectDeclarator,  DirectDeclarator, LParen, ParameterTypeList, RParen),
+        // TODO(chronister, jul 16 17) this rule is necessary for old style
+        // function declarations to be interpreted correctly (with identifiers
+        // as variable names and not types), but I believe it's ambiguous with a
+        // ParameterTypeList of unlabeled types (parsed by the above rule)
+        //GrammarRule(parse_FunctionDecl, DirectDeclarator,  DirectDeclarator, LParen, IdentifierList, RParen),
 
         GrammarRule(parse_Pointer, Pointer,  Asterisk),
         GrammarRule(parse_Pointer, Pointer,  Asterisk, TypeQualifierList),
@@ -669,18 +766,21 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_TypeQualifierList, TypeQualifierList,  TypeQualifier),
         GrammarRule(parse_TypeQualifierList, TypeQualifierList,  TypeQualifierList, TypeQualifier),
 
-        GrammarRule(parse_TODO, ParameterTypeList,  ParameterList),
-        GrammarRule(parse_TODO, ParameterTypeList,  ParameterList, Comma, Ellipses),
+        GrammarRule(parse_Passthrough, ParameterTypeList,  ParameterList),
+        GrammarRule(parse_VarArgParams, ParameterTypeList,  ParameterList, Comma, Ellipses),
 
-        GrammarRule(parse_TODO, ParameterList,  ParameterDeclaration),
-        GrammarRule(parse_TODO, ParameterList,  ParameterList, Comma, ParameterDeclaration),
+        GrammarRule(parse_DeclList, ParameterList,  ParameterDeclaration),
+        GrammarRule(parse_DeclList, ParameterList,  ParameterList, Comma, ParameterDeclaration),
 
-        GrammarRule(parse_TODO, ParameterDeclaration,  DeclarationSpecifiers, Declarator),
-        GrammarRule(parse_TODO, ParameterDeclaration,  DeclarationSpecifiers),
+        GrammarRule(parse_Passthrough, ParameterDeclaration,  DeclarationSpecifiers),
+        GrammarRule(parse_ParamDecl, ParameterDeclaration,  DeclarationSpecifiers, Declarator),
         GrammarRule(parse_TODO, ParameterDeclaration,  DeclarationSpecifiers, AbstractDeclarator),
 
-        GrammarRule(parse_TODO, IdentifierList,  Identifier),
-        GrammarRule(parse_TODO, IdentifierList,  IdentifierList, Comma, Identifier),
+        // NOTE(chronister, jul 16 17): this appears to only be used in parsing
+        // DirectDeclarators for function decls, and the rule that uses it seems
+        // to be unnecessary (see NOTE on that rule above)
+        //GrammarRule(parse_IdentifierList, IdentifierList,  Identifier),
+        //GrammarRule(parse_IdentifierList, IdentifierList,  IdentifierList, Comma, Identifier),
 
         GrammarRule(parse_TODO, TypeName,  SpecifierQualifierList),
         GrammarRule(parse_TODO, TypeName,  SpecifierQualifierList, AbstractDeclarator),
