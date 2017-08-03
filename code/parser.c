@@ -547,11 +547,11 @@ void* Parse(tokenizer* Tokenizer)
 
     array(lr_stack_item) Stack = array_new(lr_stack_item, 10);
 
-    token Token = Process(PeekToken(Tokenizer)); 
+    token Token = PeekToken(Tokenizer); 
     int State = 0;
 
     do {
-        if (Token.Type == TerminalMIN) { Token = Process(PeekToken(Tokenizer)); }
+        if (Token.Type == TerminalMIN) { Token = PeekToken(Tokenizer); }
         lr_table_transition Action = cell(Table, State, Token.Type);
 
         switch(Action.Type) {

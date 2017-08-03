@@ -30,6 +30,7 @@
     X(UnaryOperator),       \
     X(Conditional),         \
     X(Jump),                \
+    X(Cast),                \
     X(Assignment),          \
     X(TranslationUnit),     \
 
@@ -40,11 +41,13 @@ typedef void* cst_node;
 #include "array.c"
 
 typedef enum cst_node_type {
+    CST_Invalid,
     CST_NODE_LIST(CST_)
     CST_NODE_MAX,
 } cst_node_type;
 
 const char* CST_NodeNames[] = {
+    "(invalid)"
     CST_NODE_LIST(STR)
 };
 
@@ -53,7 +56,7 @@ typedef struct {
     int SourceLine;
 } cst_node_header;
 
-#define CST_NODE_TYPE(node) (*(cst_node_type*)(node))
+#define CST_NODE_TYPE(node) (node == NULL ? CST_Invalid : (*(cst_node_type*)(node)))
 
 typedef struct {
     cst_node_header Header;
@@ -91,7 +94,8 @@ typedef struct {
     cst_node_header Header;
 
     bool IsUnion;
-    // TODO
+    cst_node_identifier* Name;
+    array(cst_node) Declarations;
 } cst_node_structured_type;
 
 typedef struct {
@@ -110,7 +114,7 @@ typedef struct {
 typedef struct {
     cst_node_header Header;
 
-    cst_node ReturnType;        // Any valid type node
+    cst_node ReturnType;        // Any valid type-decl node
     cst_node_identifier* Name;  // Name of the function type. 
                                 //  NULL if this is part of another declaration,
                                 //  for example if the outer declaration is a function 
@@ -140,6 +144,7 @@ typedef struct {
     cst_node_header Header;
 
     cst_declaration_flags SpecifierFlags;       // 0 if no flags are known or specified
+    int BitfieldWidth;                          // Only in structs, ignored otherwise. 0 if not specified.
     array(cst_declaration_flags) PointerLevel;  // array whose length is the pointer level,
                                                 // each entry of which indicates the qualifiers
                                                 // of the type pointed to at that level
@@ -218,6 +223,13 @@ typedef struct {
 typedef struct {
     cst_node_header Header;
 
+    cst_node TargetType;
+    cst_node Operand;
+} cst_node_cast;
+
+typedef struct {
+    cst_node_header Header;
+
     cf_symbol_t Operator;
     cst_node LValue;
     cst_node RValue;
@@ -246,12 +258,12 @@ typedef struct {
 
 #define CF_MAX_SYMBOLS_PER_RULE 20
 
-#define PushNode(Context, X) _PushNode(Context, (cst_node*)&(X), sizeof(X))
-always_inline cst_node* 
-_PushNode(c_context* Context, cst_node* NodePtr, size_t NodeSize)
+#define PushNode(Context, X) _PushNode(Context, (cst_node)&(X), sizeof(X))
+always_inline cst_node
+_PushNode(c_context* Context, cst_node NodePtr, size_t NodeSize)
 {
     assert(Context->Used + NodeSize < Context->Allocated);
-    cst_node* Result = (cst_node*)((uint8_t*)Context->Memory + Context->Used);
+    cst_node Result = (cst_node)((uint8_t*)Context->Memory + Context->Used);
     Context->Used += NodeSize;
     memcpy(Result, NodePtr, NodeSize);
     return Result;

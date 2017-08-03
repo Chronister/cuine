@@ -6,6 +6,22 @@ static volatile const int * const * const volatile ** restrict volatile *ptr;
 
 typedef int int32_t;
 
+union vec2 {
+    struct {
+        int x, y;
+    } pt;
+    struct {
+        int w, h;
+    } sz;
+};
+
+struct foo_props {
+    bool isBar;
+    volatile float bazAmount;
+
+    const int (*do_baz)(union vec2);
+};
+
 //typedef long long (*foo_t)(int);
 //foo_t foos[3];
 long long foo(int bar), foo2(float baz);

@@ -57,7 +57,9 @@ void WalkTree(lst_node* Node, int Tab) {
 #endif
 
 void WalkTree(cst_node Node, int Tab, bool Inline) {
-    if (!Inline && (Node ? (*(cst_node_type*)Node != CST_Block && *(cst_node_type*)Node != CST_DeclarationList) : 1))
+    if (!Inline && 
+        (Node ? (*(cst_node_type*)Node != CST_Block && 
+                 *(cst_node_type*)Node != CST_DeclarationList) : 1))
         for (int i = 0; i < Tab; ++i) printf("  ");
 
     if (Node == NULL) {
@@ -80,27 +82,48 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
         case CST_FunctionType:
         {
             cst_node_function_type* Func = (cst_node_function_type*)Node;
-            printf("function");
-            printf(" (");
+            printf("( ");
             array_for(cst_node, Argument, Func->Arguments) {
                 WalkTree(Argument, Tab + 1, true);
                 if (ArgumentIndex < Func->Arguments.Length - 1) printf(", ");
             }
             printf(") -> ");
             WalkTree(Func->ReturnType, Tab + 1, true);
-            if (!Inline) printf("\n");
-            if (Func->Body) WalkTree(Func->Body, Tab, Inline);
+            if (Func->Body) {
+                printf("\n");
+                WalkTree(Func->Body, Tab, Inline);
+            }
+        } break;
+
+        case CST_StructuredType:
+        {
+            cst_node_structured_type* Struct = (cst_node_structured_type*)Node;
+            if (Struct->IsUnion) { printf("union "); }
+            else { printf("struct "); }
+
+            if (Struct->Name != NULL) WalkTree(Struct->Name, Tab, true);
+
+            if (Struct->Declarations.Length > 0) {
+                printf("\n");
+                array_for(cst_node, Decl, Struct->Declarations) {
+                    WalkTree(Decl, Tab + 1, Inline);
+                }
+            }
         } break;
 
         case CST_Block:
-            //array_for(cst_node, Stmt, ((cst_node_block*)Node)->Statements) {
-            //    WalkTree(Stmt, Tab + 1, false);
-            //}
+            array_for(cst_node, Stmt, ((cst_node_block*)Node)->Statements) {
+                WalkTree(Stmt, Tab + 1, false);
+            }
             break;
 
         case CST_Declaration:
         {
             cst_node_declaration* Decl = (cst_node_declaration*)Node;
+
+            WalkTree(Decl->Name, Tab + 1, true);
+            printf(" : ");
+
             if (Decl->SpecifierFlags & DECL_TYPEDEF) printf("typedef ");
             if (Decl->SpecifierFlags & DECL_EXTERN) printf("extern ");
             if (Decl->SpecifierFlags & DECL_STATIC) printf("static ");
@@ -117,10 +140,9 @@ void WalkTree(cst_node Node, int Tab, bool Inline) {
                 if (Pointer & DECL_RESTRICT) printf("restrict ");
                 if (Pointer & DECL_VOLATILE) printf("volatile ");
             }
-            WalkTree(Decl->Name, Tab + 1, true);
 
             if (Decl->Initializer != NULL) {
-                printf(" = ");
+                printf("= ");
                 WalkTree(Decl->Initializer, Tab + 1, true);
             }
 

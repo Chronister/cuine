@@ -1,4 +1,4 @@
-enum foobar { FOO, BAR };
+//enum foobar { FOO, BAR };
 
 typedef int (*fooptr_t)(int);
 typedef fooptr_t (*foomaker_t)(enum foobar);
@@ -13,7 +13,7 @@ int (*foomaker(enum foobar kind))(int)
     if (kind == FOO) return foo;
     if (kind == BAR) return bar;
     return identity;
-};
+}
 
 //foomaker_t foomakermaker()
 static int (*(*foomakermaker())(enum foobar))(int) { return foomaker; }
