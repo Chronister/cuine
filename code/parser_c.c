@@ -52,9 +52,6 @@ PARSE_FUNC(parse_TranslationUnit, Context, Tokens, Parsed) {
     }
 }
 
-PARSE_FUNC(parse_ExternDecl, Context, Tokens, Parsed) {
-    return array_at(Parsed, 0);
-}
 
 PARSE_FUNC(parse_FunctionDefn, Context, Tokens, Parsed) {
     cst_node_declaration* Base = cast(cst_node_declaration*, array_at(Parsed, 1));
@@ -315,30 +312,12 @@ PARSE_FUNC(parse_StructuredType, Context, Tokens, Parsed)
     return PushNode(Context, Node);
 }
 
-PARSE_FUNC(parse_StructDeclaration, Context, Tokens, Parsed) {
-    cst_node_declaration* Type = NULL;
-    cst_node_declaration_list* Decls = NULL;
-    cst_declaration_flags SpecifierFlags = 0;
-    array_for(token, Token, Tokens) {
-        switch(Token.Type) {
-            case TypeSpecifier:
-                Type = array_at(Parsed, TokenIndex);
-                break;
-            case SpecifierQualifierList:
-                SpecifierFlags |= (cst_declaration_flags)array_at(Parsed, TokenIndex);
-                break;
-            case StructDeclaratorList:
-                Decls = array_at(Parsed, TokenIndex);
-                break;
-        }
-    }
-
-    assert(Type != NULL);
-    assert(Decls != NULL);
+PARSE_FUNC(parse_StructDecl, Context, Tokens, Parsed) {
+    cst_node_declaration_list* Decls = cast(cst_node_declaration_list*, array_at(Parsed, 1));
+    cst_node_declaration* Type = cast(cst_node_declaration*, array_at(Parsed, 0));
 
     array_for(cst_node, Node, Decls->Declarations) {
         cst_node_declaration* Decl = cast(cst_node_declaration*, Node);
-        //Decl->BaseType = Type;
         switch(CST_NODE_TYPE(Decl->BaseType)) {
             case CST_Invalid:
                 Decl->BaseType = Type;
@@ -350,11 +329,30 @@ PARSE_FUNC(parse_StructDeclaration, Context, Tokens, Parsed) {
                 assert(!"TODO");
                 break;
         }
-        Decl->SpecifierFlags |= SpecifierFlags;
+        Decl->SpecifierFlags |= Type->SpecifierFlags;
     }
-
     // free(Type);
     return Decls;
+}
+
+PARSE_FUNC(parse_SpecifierQualifierList, Context, Tokens, Parsed) {
+    cst_node_declaration* Type = NULL;
+    cst_declaration_flags SpecifierFlags = 0;
+    array_for(token, Token, Tokens) {
+        switch(Token.Type) {
+            case TypeSpecifier:
+                Type = array_at(Parsed, TokenIndex);
+                break;
+            case SpecifierQualifierList:
+                SpecifierFlags |= (cst_declaration_flags)array_at(Parsed, TokenIndex);
+                break;
+        }
+    }
+
+    assert(Type != NULL);
+    Type->SpecifierFlags |= SpecifierFlags;
+
+    return Type;
 }
 
 PARSE_FUNC(parse_StructDeclarator, Context, Tokens, Parsed) {
@@ -519,6 +517,11 @@ PARSE_FUNC(parse_CharacterConstant, Context, Tokens, Parsed) {
     return PushNode(Context, Node);
 }
 
+PARSE_FUNC(parse_EmptyExpr, Context, Tokens, Parsed) {
+    cst_node_expression Expr = { CST_Empty };
+    return PushNode(Context, Expr);
+}
+
 PARSE_FUNC(parse_BinaryExpression, Context, Tokens, Parsed) {
     cst_node_binary_operator Node = { CST_BinaryOperator };
     Node.Operation = array_at(Tokens, 1).Type;
@@ -606,6 +609,42 @@ PARSE_FUNC(parse_AssignmentExpr, Context, Tokens, Parsed) {
     return PushNode(Context, Node);
 }
 
+PARSE_FUNC(parse_WhileStmt, Context, Tokens, Parsed) {
+    cst_node_iteration Iter = { CST_Iteration };
+    Iter.Condition = array_at(Parsed, 2);
+    Iter.Body = array_at(Parsed, 4);
+    return PushNode(Context, Iter);
+}
+
+PARSE_FUNC(parse_DoStmt, Context, Tokens, Parsed) {
+    cst_node_iteration Iter = { CST_Iteration };
+    Iter.PostCondition = true;
+    Iter.Condition = array_at(Parsed, 4);
+    Iter.Body = array_at(Parsed, 1);
+    return PushNode(Context, Iter);
+}
+
+PARSE_FUNC(parse_ForStmt, Context, Tokens, Parsed) {
+    cst_node_iteration Iter = { CST_Iteration };
+
+    int Section = 0;
+    array_for(token, Token, Tokens) {
+        switch(Token.Type) {
+            case FOR: break;
+            case Semicolon: Section++; break;
+            case Expression:
+                if      (Section == 0) Iter.Initialization = array_at(Parsed, TokenIndex);
+                else if (Section == 1) Iter.Condition      = array_at(Parsed, TokenIndex);
+                else if (Section == 2) Iter.Increment      = array_at(Parsed, TokenIndex);
+                else_invalid;
+                break;
+            case Statement: Iter.Body = array_at(Parsed, TokenIndex); break;
+            default_invalid;
+        }
+    }
+    return PushNode(Context, Iter);
+}
+
 PARSE_FUNC(parse_TODO, Context, Tokens, Parsed) {
     array_for(token, Token, Tokens) {
         printf("\tTokens[%d]: %s\n", TokenIndex, SymbolStr(Token.Type));
@@ -635,8 +674,8 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_TODO, PostfixExpression,  PostfixExpression, LBracket, Expression, RBracket),
         GrammarRule(parse_TODO, PostfixExpression,  PostfixExpression, LParen, RParen),
         GrammarRule(parse_TODO, PostfixExpression,  PostfixExpression, LParen, ArgumentExpressionList, RParen),
-        GrammarRule(parse_TODO, PostfixExpression,  PostfixExpression, Dot, Identifier),
-        GrammarRule(parse_TODO, PostfixExpression,  PostfixExpression, Arrow, Identifier),
+        GrammarRule(parse_BinaryExpression, PostfixExpression,  PostfixExpression, Dot, Identifier),
+        GrammarRule(parse_BinaryExpression, PostfixExpression,  PostfixExpression, Arrow, Identifier),
         GrammarRule(parse_UnaryPostfixExpression, PostfixExpression,  PostfixExpression, Increment),
         GrammarRule(parse_UnaryPostfixExpression, PostfixExpression,  PostfixExpression, Decrement),
         GrammarRule(parse_TODO, PostfixExpression,  LParen, TypeName, RParen, LCurly, InitializerList, RCurly),
@@ -798,13 +837,12 @@ cf_grammar GenerateGrammar()
         // which seem completely nonsensical).
         // {
         GrammarRule(parse_Passthrough, StructDeclaration,  StructDeclaratorList, Semicolon),
-        GrammarRule(parse_StructDeclaration, StructDeclaration,  TypeSpecifier, StructDeclaratorList, Semicolon),
-        GrammarRule(parse_StructDeclaration, StructDeclaration,  TypeSpecifier, SpecifierQualifierList, StructDeclaratorList, Semicolon),
-        GrammarRule(parse_StructDeclaration, StructDeclaration,  SpecifierQualifierList, TypeSpecifier, StructDeclaratorList, Semicolon),
-        GrammarRule(parse_StructDeclaration, StructDeclaration,  SpecifierQualifierList, TypeSpecifier, SpecifierQualifierList, StructDeclaratorList, Semicolon),
+        GrammarRule(parse_StructDecl, StructDeclaration,  SpecifierQualifierList, StructDeclaratorList, Semicolon),
 
-        GrammarRule(parse_TypeQualifierList, SpecifierQualifierList,  TypeQualifier),
-        GrammarRule(parse_TypeQualifierList, SpecifierQualifierList,  TypeQualifier, SpecifierQualifierList),
+        GrammarRule(parse_SpecifierQualifierList, SpecifierQualifierList,  TypeSpecifier),
+        GrammarRule(parse_SpecifierQualifierList, SpecifierQualifierList,  TypeSpecifier, TypeQualifierList),
+        GrammarRule(parse_SpecifierQualifierList, SpecifierQualifierList,  TypeQualifierList, TypeSpecifier),
+        GrammarRule(parse_SpecifierQualifierList, SpecifierQualifierList,  TypeQualifierList, TypeSpecifier, TypeQualifierList),
         // }
 
         GrammarRule(parse_DeclList, StructDeclaratorList,  StructDeclarator),
@@ -937,7 +975,7 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_Passthrough, Statement,  CompoundStatement),
         GrammarRule(parse_Passthrough, Statement,  ExpressionStatement),
         GrammarRule(parse_Passthrough, Statement,  SelectionStatement),
-        GrammarRule(parse_TODO, Statement,  IterationStatement),
+        GrammarRule(parse_Passthrough, Statement,  IterationStatement),
         GrammarRule(parse_Passthrough, Statement,  JumpStatement),
          
         GrammarRule(parse_TODO, LabeledStatement,  Identifier, Colon, Statement),
@@ -953,24 +991,24 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_Passthrough, BlockItem,  Declaration),
         GrammarRule(parse_Passthrough, BlockItem,  Statement),
 
-        GrammarRule(parse_TODO, ExpressionStatement,  Semicolon),
+        GrammarRule(parse_EmptyExpr, ExpressionStatement,  Semicolon),
         GrammarRule(parse_Passthrough, ExpressionStatement,  Expression, Semicolon),
 
         GrammarRule(parse_If, SelectionStatement,  IF, LParen, Expression, RParen, Statement),
         GrammarRule(parse_If, SelectionStatement,  IF, LParen, Expression, RParen, Statement, ELSE, Statement),
         GrammarRule(parse_TODO, SelectionStatement,  SWITCH, LParen, Expression, RParen, Statement),
 
-        GrammarRule(parse_TODO, IterationStatement,  WHILE, LParen, Expression, RParen, Statement),
-        GrammarRule(parse_TODO, IterationStatement,  DO, Statement, WHILE, LParen, Expression, RParen, Semicolon),
+        GrammarRule(parse_WhileStmt, IterationStatement,  WHILE, LParen, Expression, RParen, Statement),
+        GrammarRule(parse_DoStmt, IterationStatement,  DO, Statement, WHILE, LParen, Expression, RParen, Semicolon),
 
-        GrammarRule(parse_TODO, IterationStatement,  FOR, Semicolon, Semicolon, RParen, Statement),
-        GrammarRule(parse_TODO, IterationStatement,  FOR, Expression, Semicolon, Semicolon, RParen, Statement),
-        GrammarRule(parse_TODO, IterationStatement,  FOR, Semicolon, Expression, Semicolon, RParen, Statement),
-        GrammarRule(parse_TODO, IterationStatement,  FOR, Expression, Semicolon, Expression, Semicolon, RParen, Statement),
-        GrammarRule(parse_TODO, IterationStatement,  FOR, Semicolon, Semicolon, Expression, RParen, Statement),
-        GrammarRule(parse_TODO, IterationStatement,  FOR, Expression, Semicolon, Semicolon, Expression, RParen, Statement),
-        GrammarRule(parse_TODO, IterationStatement,  FOR, Semicolon, Expression, Semicolon, Expression, RParen, Statement),
-        GrammarRule(parse_TODO, IterationStatement,  FOR, Expression, Semicolon, Expression, Semicolon, Expression, RParen, Statement),
+        GrammarRule(parse_ForStmt, IterationStatement,  FOR, Semicolon, Semicolon, RParen, Statement),
+        GrammarRule(parse_ForStmt, IterationStatement,  FOR, Expression, Semicolon, Semicolon, RParen, Statement),
+        GrammarRule(parse_ForStmt, IterationStatement,  FOR, Semicolon, Expression, Semicolon, RParen, Statement),
+        GrammarRule(parse_ForStmt, IterationStatement,  FOR, Expression, Semicolon, Expression, Semicolon, RParen, Statement),
+        GrammarRule(parse_ForStmt, IterationStatement,  FOR, Semicolon, Semicolon, Expression, RParen, Statement),
+        GrammarRule(parse_ForStmt, IterationStatement,  FOR, Expression, Semicolon, Semicolon, Expression, RParen, Statement),
+        GrammarRule(parse_ForStmt, IterationStatement,  FOR, Semicolon, Expression, Semicolon, Expression, RParen, Statement),
+        GrammarRule(parse_ForStmt, IterationStatement,  FOR, Expression, Semicolon, Expression, Semicolon, Expression, RParen, Statement),
 
         GrammarRule(parse_TODO, JumpStatement,  GOTO, Identifier, Semicolon),
         GrammarRule(parse_JumpStmt, JumpStatement,  CONTINUE, Semicolon),
@@ -982,8 +1020,8 @@ cf_grammar GenerateGrammar()
         GrammarRule(parse_TranslationUnit, TranslationUnit,  ExternalDeclaration),
         GrammarRule(parse_TranslationUnit, TranslationUnit,  TranslationUnit, ExternalDeclaration),
 
-        GrammarRule(parse_ExternDecl, ExternalDeclaration,  FunctionDefinition),
-        GrammarRule(parse_ExternDecl, ExternalDeclaration,  Declaration),
+        GrammarRule(parse_Passthrough, ExternalDeclaration,  FunctionDefinition),
+        GrammarRule(parse_Passthrough, ExternalDeclaration,  Declaration),
 
         GrammarRule(parse_FunctionDefn, FunctionDefinition,  DeclarationSpecifiers, Declarator, CompoundStatement),
         // NOTE(chronister, jul 7 17): omitting the old-style definitions as

@@ -11,6 +11,7 @@
 #define NonterminalMAX C_NonterminalMAX
 
 #define CST_NODE_LIST(X)    \
+    X(TranslationUnit),     \
     X(Identifier),          \
     X(BuiltinType),         \
     X(StructuredType),      \
@@ -21,7 +22,6 @@
     X(DeclarationList),     \
     X(VariadicArgument),    \
     X(Block),               \
-    X(Statement),           \
     X(StringConstant),      \
     X(IntegerConstant),     \
     X(FloatingConstant),    \
@@ -32,7 +32,8 @@
     X(Jump),                \
     X(Cast),                \
     X(Assignment),          \
-    X(TranslationUnit),     \
+    X(Empty),               \
+    X(Iteration),           \
 
 #define CST_(x) CST_##x
 
@@ -204,6 +205,11 @@ typedef struct {
 
 typedef struct {
     cst_node_header Header;
+    //cst_node_label* Label; // NULL if unlabelled
+} cst_node_expression;
+
+typedef struct {
+    cst_node_expression Expr;
 
     cf_symbol_t Operation;
     cst_node Left;
@@ -213,7 +219,7 @@ typedef struct {
 enum affix_t { PREFIX = 0, POSTFIX };
 
 typedef struct {
-    cst_node_header Header;
+    cst_node_expression Expr;
 
     cf_symbol_t Operation;
     cst_node Operand;
@@ -221,14 +227,14 @@ typedef struct {
 } cst_node_unary_operator;
 
 typedef struct {
-    cst_node_header Header;
+    cst_node_expression Expr;
 
     cst_node TargetType;
     cst_node Operand;
 } cst_node_cast;
 
 typedef struct {
-    cst_node_header Header;
+    cst_node_expression Expr;
 
     cf_symbol_t Operator;
     cst_node LValue;
@@ -236,7 +242,7 @@ typedef struct {
 } cst_node_assignment;
 
 typedef struct {
-    cst_node_header Header;
+    cst_node_expression Expr;
 
     cst_node Condition;
     cst_node TrueBranch;
@@ -244,11 +250,26 @@ typedef struct {
 } cst_node_conditional;
 
 typedef struct {
-    cst_node_header Header;
+    cst_node_expression Expr;
 
     cf_symbol_t Type;
     cst_node Expression; // NULL unless Type is RETURN and an expression is being returned
 } cst_node_jump;
+
+typedef struct {
+    cst_node_expression Expr;
+
+    bool PostCondition; // In C, only set for do { } while() loops.
+    // All of the following can be null (loop only terminates if there's a
+    // break) or any combo can be set to an expression.
+    cst_node Initialization;
+    cst_node Condition;
+    cst_node Increment;
+
+    cst_node Body;
+} cst_node_iteration;
+
+///
 
 typedef struct {
     void* Memory;
