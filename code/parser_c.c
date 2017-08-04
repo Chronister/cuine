@@ -328,6 +328,7 @@ PARSE_FUNC(parse_StructDecl, Context, Tokens, Parsed) {
             case CST_ArrayType:
                 assert(!"TODO");
                 break;
+            default_invalid;
         }
         Decl->SpecifierFlags |= Type->SpecifierFlags;
     }
